@@ -1,44 +1,57 @@
 // utils.js
 
 const Utils = (() => {
-
+    /**
+     * Formats a number using Intl.NumberFormat.
+     * @param {number} num The number to format.
+     * @param {object} options Formatting options.
+     * @returns {string} The formatted number string.
+     */
     function formatNumber(num, options = {}) {
-        // Ensure num is a valid number, otherwise return a placeholder
-        const parsedNum = parseFloat(num);
-        if (Number.isNaN(parsedNum)) {
-            return '---'; // Or 'N/A', or 'Invalid Number'
+        if (typeof num !== 'number' || isNaN(num)) {
+            return options.defaultValue || 'N/A';
         }
 
-        const { style = 'decimal', currency = 'USD', minimumFractionDigits = 2, maximumFractionDigits = 2, compact = false } = options;
+        const defaultOptions = {
+            style: 'decimal',
+            currency: 'USD',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+            compact: false,
+            notation: 'standard'
+        };
+
+        const mergedOptions = { ...defaultOptions, ...options };
+
+        if (mergedOptions.compact) {
+            mergedOptions.notation = 'compact';
+        }
 
         try {
-            if (compact) {
-                return new Intl.NumberFormat('en-US', {
-                    notation: 'compact',
-                    compactDisplay: 'short',
-                    minimumFractionDigits: minimumFractionDigits,
-                    maximumFractionDigits: maximumFractionDigits
-                }).format(parsedNum);
-            } else if (style === 'currency') {
-                return new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: currency,
-                    minimumFractionDigits: minimumFractionDigits,
-                    maximumFractionDigits: maximumFractionDigits
-                }).format(parsedNum);
-            } else {
-                return new Intl.NumberFormat('en-US', {
-                    minimumFractionDigits: minimumFractionDigits,
-                    maximumFractionDigits: maximumFractionDigits
-                }).format(parsedNum);
-            }
+            return new Intl.NumberFormat('en-US', mergedOptions).format(num);
         } catch (e) {
-            console.error("Utils.formatNumber: Error formatting number", num, e);
-            return '---'; // Fallback in case of formatting error
+            console.error("Error formatting number:", num, e);
+            return num.toFixed(mergedOptions.minimumFractionDigits); // Fallback
         }
     }
 
-    function downloadFile(data, filename, type = 'application/json') {
+    /**
+     * Formats an amount as USD currency.
+     * @param {number} amount The amount to format.
+     * @param {number} fractionDigits Number of decimal places.
+     * @returns {string} The formatted USD string.
+     */
+    function formatUSD(amount, fractionDigits = 0) {
+        return formatNumber(amount, { style: 'currency', currency: 'USD', minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits });
+    }
+
+    /**
+     * Downloads data as a file.
+     * @param {string} data The data to download.
+     * @param {string} filename The name of the file.
+     * @param {string} type The MIME type of the file.
+     */
+    function downloadFile(data, filename, type) {
         const blob = new Blob([data], { type: type });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -50,8 +63,51 @@ const Utils = (() => {
         URL.revokeObjectURL(url);
     }
 
+    /**
+     * Converts an array of objects to a CSV string.
+     * @param {Array<object>} objArray The array of objects.
+     * @returns {string} The CSV string.
+     */
+    function convertToCSV(objArray) {
+        const array = typeof objArray != 'object' ? JSON.parse(objArray) : objArray;
+        let str = '';
+        let row = '';
+
+        if (array.length === 0) return '';
+
+        // Header row
+        for (let index in array[0]) {
+            row += index + ',';
+        }
+        row = row.slice(0, -1); // Remove trailing comma
+        str += row + '\r\n';
+
+        // Data rows
+        for (let i = 0; i < array.length; i++) {
+            let line = '';
+            for (let index in array[i]) {
+                if (line != '') line += ','
+
+                let value = array[i][index];
+                if (typeof value === 'object' && value !== null) {
+                    value = JSON.stringify(value).replace(/"/g, '""'); // Handle nested objects by stringifying and escaping quotes
+                } else if (typeof value === 'string') {
+                    value = value.replace(/"/g, '""'); // Escape quotes for CSV
+                }
+                if (value.includes(',') || value.includes('\n') || value.includes('"')) {
+                    value = `"${value}"`; // Enclose in quotes if it contains commas, newlines, or quotes
+                }
+                line += value;
+            }
+            str += line + '\r\n';
+        }
+        return str;
+    }
+
     return {
-        formatNumber: formatNumber,
-        downloadFile: downloadFile,
+        formatNumber,
+        formatUSD,
+        downloadFile,
+        convertToCSV
     };
 })();
