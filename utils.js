@@ -64,45 +64,56 @@ const Utils = (() => {
     }
 
     /**
-     * Converts an array of objects to a CSV string.
-     * @param {Array<object>} objArray The array of objects.
-     * @returns {string} The CSV string.
-     */
-    function convertToCSV(objArray) {
-        const array = typeof objArray != 'object' ? JSON.parse(objArray) : objArray;
-        let str = '';
-        let row = '';
+ * Converts an array of objects to a CSV string.
+ * @param {Array<object>} objArray The array of objects.
+ * @returns {string} The CSV string.
+ */
+function convertToCSV(objArray) {
+    const array = typeof objArray != 'object' ? JSON.parse(objArray) : objArray;
+    let str = '';
+    let row = '';
 
-        if (array.length === 0) return '';
+    if (array.length === 0) return '';
 
-        // Header row
-        for (let index in array[0]) {
-            row += index + ',';
-        }
-        row = row.slice(0, -1); // Remove trailing comma
-        str += row + '\r\n';
-
-        // Data rows
-        for (let i = 0; i < array.length; i++) {
-            let line = '';
-            for (let index in array[i]) {
-                if (line != '') line += ','
-
-                let value = array[i][index];
-                if (typeof value === 'object' && value !== null) {
-                    value = JSON.stringify(value).replace(/"/g, '""'); // Handle nested objects by stringifying and escaping quotes
-                } else if (typeof value === 'string') {
-                    value = value.replace(/"/g, '""'); // Escape quotes for CSV
-                }
-                if (value.includes(',') || value.includes('\n') || value.includes('"')) {
-                    value = `"${value}"`; // Enclose in quotes if it contains commas, newlines, or quotes
-                }
-                line += value;
-            }
-            str += line + '\r\n';
-        }
-        return str;
+    // Header row
+    for (let index in array[0]) {
+        row += index + ',';
     }
+    row = row.slice(0, -1); // Remove trailing comma
+    str += row + '\r\n';
+
+    // Data rows
+    for (let i = 0; i < array.length; i++) {
+        let line = '';
+        for (let index in array[i]) {
+            if (line != '') line += ',';
+
+            let value = array[i][index];
+
+            // Handle null and undefined values
+            if (value === null || typeof value === 'undefined') {
+                value = ''; // Treat null/undefined as empty string in CSV
+            } else if (typeof value === 'object') {
+                // For objects, stringify and then handle like a string
+                value = JSON.stringify(value);
+            } else {
+                // Convert all other types (numbers, booleans, etc.) to string
+                value = String(value);
+            }
+
+            // Escape quotes for CSV
+            value = value.replace(/"/g, '""');
+
+            // Enclose in quotes if it contains commas, newlines, or quotes
+            if (value.includes(',') || value.includes('\n') || value.includes('"')) {
+                value = `"${value}"`;
+            }
+            line += value;
+        }
+        str += line + '\r\n';
+    }
+    return str;
+}
 
     return {
         formatNumber,
