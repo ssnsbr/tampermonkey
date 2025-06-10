@@ -168,3 +168,40 @@ function updateHUDContent(sectionId, htmlContent) {
         contentArea.innerHTML = htmlContent;
     }
 }
+
+/**
+ * Processes raw chart data from an API response, filters for new bars,
+ * adds them to the global allChartBars array, sorts the array, and updates the HUD.
+ * @param {Array} bars The 'bars' array from the chart API response.
+ * @param {boolean} noData A boolean indicating if the API returned no more data.
+ * @param {Array} allChartBars The global array holding all collected chart bars. (Will be modified by reference)
+ * @param {string} type The type of interception ('XHR' or 'Fetch') for logging purposes.
+ */
+function processChartData(bars, noData, allChartBars, type) {
+    if (noData) {
+        console.log(`%c[Main][${type} Interception] Chart API response indicates no more data (noData: true).`, 'color: gray;');
+        return;
+    }
+
+    if (Array.isArray(bars) && bars.length > 0) {
+        const newBars = bars.filter(newBar =>
+            !allChartBars.some(existingBar => existingBar.time === newBar.time)
+        );
+        console.log(`%c[Main][${type} Interception] Found ${bars.length} bars in response. Adding ${newBars.length} new unique bars.`, 'color: teal;');
+        allChartBars.push(...newBars);
+        allChartBars.sort((a, b) => a.time - b.time); // Keep bars sorted by time
+
+        console.log(`%c[Main][${type} Interception] Total unique chart bars collected: ${allChartBars.length}`, 'color: darkgreen; font-weight: bold;');
+
+        // Update HUD content for chart data section
+        const firstBarTime = allChartBars.length > 0 ? new Date(allChartBars[0].time).toLocaleString() : 'N/A';
+        const lastBarTime = allChartBars.length > 0 ? new Date(allChartBars[allChartBars.length - 1].time).toLocaleString() : 'N/A';
+        updateHUDContent('hud-chart-data-section', `
+            Collected Chart Bars: ${allChartBars.length}<br>
+            Range: ${firstBarTime}<br>
+            To: ${lastBarTime}
+        `);
+    } else {
+        console.warn(`%c[Main][${type} Interception] Chart API response contains no 'bars' array or it's empty.`, 'color: orange;');
+    }
+}
