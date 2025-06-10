@@ -3,28 +3,38 @@
 const Utils = (() => {
 
     function formatNumber(num, options = {}) {
-        // Example: format to currency or compact numbers
+        // Ensure num is a valid number, otherwise return a placeholder
+        const parsedNum = parseFloat(num);
+        if (Number.isNaN(parsedNum)) {
+            return '---'; // Or 'N/A', or 'Invalid Number'
+        }
+
         const { style = 'decimal', currency = 'USD', minimumFractionDigits = 2, maximumFractionDigits = 2, compact = false } = options;
 
-        if (compact) {
-            return new Intl.NumberFormat('en-US', {
-                notation: 'compact',
-                compactDisplay: 'short',
-                minimumFractionDigits: minimumFractionDigits,
-                maximumFractionDigits: maximumFractionDigits
-            }).format(num);
-        } else if (style === 'currency') {
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: currency,
-                minimumFractionDigits: minimumFractionDigits,
-                maximumFractionDigits: maximumFractionDigits
-            }).format(num);
-        } else {
-            return new Intl.NumberFormat('en-US', {
-                minimumFractionDigits: minimumFractionDigits,
-                maximumFractionDigits: maximumFractionDigits
-            }).format(num);
+        try {
+            if (compact) {
+                return new Intl.NumberFormat('en-US', {
+                    notation: 'compact',
+                    compactDisplay: 'short',
+                    minimumFractionDigits: minimumFractionDigits,
+                    maximumFractionDigits: maximumFractionDigits
+                }).format(parsedNum);
+            } else if (style === 'currency') {
+                return new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: currency,
+                    minimumFractionDigits: minimumFractionDigits,
+                    maximumFractionDigits: maximumFractionDigits
+                }).format(parsedNum);
+            } else {
+                return new Intl.NumberFormat('en-US', {
+                    minimumFractionDigits: minimumFractionDigits,
+                    maximumFractionDigits: maximumFractionDigits
+                }).format(parsedNum);
+            }
+        } catch (e) {
+            console.error("Utils.formatNumber: Error formatting number", num, e);
+            return '---'; // Fallback in case of formatting error
         }
     }
 
@@ -40,14 +50,8 @@ const Utils = (() => {
         URL.revokeObjectURL(url);
     }
 
-    // Add any other general utility functions here
-    // e.g., debounce, throttle, date formatting, simple DOM manipulation helpers
-    // function debounce(func, delay) { ... }
-    // function throttle(func, delay) { ... }
-
     return {
         formatNumber: formatNumber,
         downloadFile: downloadFile,
-        // Add other utility functions here
     };
 })();
