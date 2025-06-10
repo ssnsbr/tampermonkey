@@ -1,207 +1,79 @@
 // ui.js
-// This file contains functions to create and manage the floating UI.
+// This file is loaded via @require in main.js
+// It exports an object 'UI' to the global scope.
 
-/**
- * Creates and appends a floating UI container.
- * It's now more generic to allow multiple content and button sections.
- * @param {object} sections An array of objects, each defining a section { id: string, title: string, elements: HTMLElement[], callbacks: object }.
- * callbacks: { onDownloadJson: Function, onDownloadPandas: Function } for each section.
- * @returns {HTMLElement} The created UI container.
- */
-function createFloatingUI(sections) {
-    // Main container for the floating UI
-    const uiContainer = document.createElement('div');
-    uiContainer.id = 'axiom-hud-container';
-    uiContainer.style.position = 'fixed';
-    uiContainer.style.top = '20px';
-    uiContainer.style.right = '20px';
-    uiContainer.style.width = '320px'; // Adjusted width for more content/buttons
-    uiContainer.style.backgroundColor = 'rgba(0,0,0,0.9)';
-    uiContainer.style.color = 'lime';
-    uiContainer.style.fontSize = '14px'; // Slightly smaller font for more info
-    uiContainer.style.fontFamily = 'monospace';
-    uiContainer.style.padding = '15px';
-    uiContainer.style.borderRadius = '8px';
-    uiContainer.style.boxShadow = '0 0 10px lime';
-    uiContainer.style.zIndex = '999999';
-    uiContainer.style.cursor = 'grab'; // Indicates it's draggable
-    uiContainer.style.resize = 'both'; // Allow resizing
-    uiContainer.style.overflow = 'auto'; // Add scrollbars if content overflows
-    uiContainer.style.maxHeight = '90vh'; // Prevent it from going off-screen vertically
+(function() {
+    'use strict';
 
-    // Header for moving the UI
-    const header = document.createElement('div');
-    header.style.textAlign = 'center';
-    header.style.fontWeight = 'bold';
-    header.style.marginBottom = '10px';
-    header.style.cursor = 'grab';
-    header.innerText = 'Axiom Token Data HUD';
-    uiContainer.appendChild(header);
+    const HUD_ID = 'axiom-token-hud';
+    let hudElement = null;
 
-    // Close button
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = 'X';
-    closeBtn.style.position = 'absolute';
-    closeBtn.style.top = '10px';
-    closeBtn.style.right = '10px';
-    closeBtn.style.background = 'none';
-    closeBtn.style.border = 'none';
-    closeBtn.style.color = 'lime';
-    closeBtn.style.fontSize = '16px';
-    closeBtn.style.cursor = 'pointer';
-    closeBtn.onclick = () => uiContainer.remove();
-    uiContainer.appendChild(closeBtn);
+    const UI = {
+        initHUD: function() {
+            // Create the main HUD container if it doesn't exist
+            hudElement = document.createElement('div');
+            hudElement.id = HUD_ID;
+            hudElement.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                background-color: rgba(0, 0, 0, 0.7);
+                color: white;
+                padding: 10px;
+                border-radius: 8px;
+                font-family: sans-serif;
+                z-index: 9999;
+                max-width: 300px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            `;
+            hudElement.innerHTML = `
+                <h3>Axiom Token Stats</h3>
+                <p>Market Cap: <span id="hud-market-cap">Loading...</span></p>
+                <p>Volume (24h): <span id="hud-volume">Loading...</span></p>
+                <p>ATH: <span id="hud-ath">Loading...</span></p>
+                <button id="download-chart-data" style="margin-top: 10px; padding: 5px 10px;">Download Chart Data</button>
+            `;
+            document.body.appendChild(hudElement);
 
-    // Add sections dynamically
-    sections.forEach(section => {
-        const sectionDiv = document.createElement('div');
-        sectionDiv.id = section.id; // e.g., 'hud-live-data-section' or 'hud-chart-data-section'
-        sectionDiv.style.marginBottom = '20px';
-        sectionDiv.style.borderTop = '1px solid rgba(0,255,0,0.3)';
-        sectionDiv.style.paddingTop = '10px';
-        sectionDiv.style.position = 'relative'; // For title absolute positioning
+            // Attach event listener for the download button (example)
+            document.getElementById('download-chart-data').addEventListener('click', () => {
+                const downloadData = DataProcessor.getCollectedChartData(); // Assuming DataProcessor stores this
+                const tokenId = window.location.pathname.split('/').pop(); // Simple way to get token ID
+                Utils.downloadDataAsJson(downloadData, `${tokenId}_chart_data_${new Date().toISOString().slice(0,10)}.json`);
+                alert('Downloading chart data...');
+            });
+        },
 
-        const sectionTitle = document.createElement('div');
-        sectionTitle.style.fontWeight = 'bold';
-        sectionTitle.style.color = 'lime';
-        sectionTitle.style.backgroundColor = 'rgba(0,0,0,0.9)';
-        sectionTitle.style.position = 'absolute';
-        sectionTitle.style.top = '-10px'; // Move title slightly above the border
-        sectionTitle.style.left = '50%';
-        sectionTitle.style.transform = 'translateX(-50%)';
-        sectionTitle.style.padding = '0 5px';
-        sectionTitle.textContent = section.title;
-        sectionDiv.appendChild(sectionTitle);
+        updateHUD: function(data) {
+            // Update the HUD with new data
+            if (!hudElement) return;
 
+            const marketCapSpan = hudElement.querySelector('#hud-market-cap');
+            const volumeSpan = hudElement.querySelector('#hud-volume');
+            const athSpan = hudElement.querySelector('#hud-ath');
 
-        // Content area for dynamic data
-        const contentArea = document.createElement('div');
-        contentArea.id = `${section.id}-content`; // e.g., 'hud-live-data-section-content'
-        sectionDiv.appendChild(contentArea);
-
-        // Append the initial elements
-        section.elements.forEach(el => contentArea.appendChild(el));
-
-        // Download Buttons container (if callbacks are provided)
-        if (section.callbacks && (section.callbacks.onDownloadJson || section.callbacks.onDownloadPandas)) {
-            const buttonContainer = document.createElement('div');
-            buttonContainer.style.marginTop = '15px';
-            buttonContainer.style.display = 'flex';
-            buttonContainer.style.gap = '10px';
-            buttonContainer.style.justifyContent = 'center';
-
-            if (section.callbacks.onDownloadJson) {
-                const downloadJsonBtn = document.createElement('button');
-                downloadJsonBtn.textContent = 'Download JSON';
-                downloadJsonBtn.style.cssText = `
-                    background-color: #007bff;
-                    color: white;
-                    border: none;
-                    padding: 8px 12px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 13px;
-                `;
-                downloadJsonBtn.onmouseover = (e) => e.target.style.backgroundColor = '#0056b3';
-                downloadJsonBtn.onmouseout = (e) => e.target.style.backgroundColor = '#007bff';
-                downloadJsonBtn.onclick = section.callbacks.onDownloadJson;
-                buttonContainer.appendChild(downloadJsonBtn);
+            if (data.marketCap !== undefined) {
+                marketCapSpan.textContent = Utils.formatNumber(data.marketCap, 'currency');
             }
-
-            if (section.callbacks.onDownloadPandas) {
-                const downloadPandasBtn = document.createElement('button');
-                downloadPandasBtn.textContent = 'Download CSV'; // Renamed from Pandas for brevity
-                downloadPandasBtn.style.cssText = `
-                    background-color: #28a745;
-                    color: white;
-                    border: none;
-                    padding: 8px 12px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 13px;
-                `;
-                downloadPandasBtn.onmouseover = (e) => e.target.style.backgroundColor = '#218838';
-                downloadPandasBtn.onmouseout = (e) => e.target.style.backgroundColor = '#28a745';
-                downloadPandasBtn.onclick = section.callbacks.onDownloadPandas;
-                buttonContainer.appendChild(downloadPandasBtn);
+            if (data.volume !== undefined) {
+                volumeSpan.textContent = Utils.formatNumber(data.volume, 'currency');
             }
-            sectionDiv.appendChild(buttonContainer);
-        }
-        uiContainer.appendChild(sectionDiv);
-    });
+            if (data.ath !== undefined) {
+                athSpan.textContent = Utils.formatNumber(data.ath, 'currency');
+            }
+        },
 
+        // Example function for rendering a chart (if you implement one)
+        renderChart: function(chartData) {
+            console.log("UI: Rendering chart with data:", chartData);
+            // This is where you'd use a charting library like Chart.js or D3.js
+            // Or simply display processed historical data in a simple table.
+        },
 
-    // Make the UI draggable
-    let isDragging = false;
-    let offsetX, offsetY;
+        // You can add more UI-specific functions here, e.g., show/hide, error messages etc.
+    };
 
-    header.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        offsetX = e.clientX - uiContainer.getBoundingClientRect().left;
-        offsetY = e.clientY - uiContainer.getBoundingClientRect().top;
-        uiContainer.style.cursor = 'grabbing';
-    });
+    // Expose UI to the global scope for main.js to use
+    window.UI = UI;
 
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        uiContainer.style.left = `${e.clientX - offsetX}px`;
-        uiContainer.style.top = `${e.clientY - offsetY}px`;
-    });
-
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-        uiContainer.style.cursor = 'grab';
-    });
-
-    document.body.appendChild(uiContainer);
-    return uiContainer;
-}
-
-/**
- * Updates the content of a specific HUD section.
- * @param {string} sectionId The ID of the section (e.g., 'hud-live-data-section').
- * @param {string} htmlContent The HTML string to set as the innerHTML of the content area.
- */
-function updateHUDContent(sectionId, htmlContent) {
-    const contentArea = document.getElementById(`${sectionId}-content`);
-    if (contentArea) {
-        contentArea.innerHTML = htmlContent;
-    }
-}
-
-/**
- * Processes raw chart data from an API response, filters for new bars,
- * adds them to the global allChartBars array, sorts the array, and updates the HUD.
- * @param {Array} bars The 'bars' array from the chart API response.
- * @param {boolean} noData A boolean indicating if the API returned no more data.
- * @param {Array} allChartBars The global array holding all collected chart bars. (Will be modified by reference)
- * @param {string} type The type of interception ('XHR' or 'Fetch') for logging purposes.
- */
-function processChartData(bars, noData, allChartBars, type) {
-    if (noData) {
-        console.log(`%c[Main][${type} Interception] Chart API response indicates no more data (noData: true).`, 'color: gray;');
-        return;
-    }
-
-    if (Array.isArray(bars) && bars.length > 0) {
-        const newBars = bars.filter(newBar =>
-            !allChartBars.some(existingBar => existingBar.time === newBar.time)
-        );
-        console.log(`%c[Main][${type} Interception] Found ${bars.length} bars in response. Adding ${newBars.length} new unique bars.`, 'color: teal;');
-        allChartBars.push(...newBars);
-        allChartBars.sort((a, b) => a.time - b.time); // Keep bars sorted by time
-
-        console.log(`%c[Main][${type} Interception] Total unique chart bars collected: ${allChartBars.length}`, 'color: darkgreen; font-weight: bold;');
-
-        // Update HUD content for chart data section
-        const firstBarTime = allChartBars.length > 0 ? new Date(allChartBars[0].time).toLocaleString() : 'N/A';
-        const lastBarTime = allChartBars.length > 0 ? new Date(allChartBars[allChartBars.length - 1].time).toLocaleString() : 'N/A';
-        updateHUDContent('hud-chart-data-section', `
-            Collected Chart Bars: ${allChartBars.length}<br>
-            Range: ${firstBarTime}<br>
-            To: ${lastBarTime}
-        `);
-    } else {
-        console.warn(`%c[Main][${type} Interception] Chart API response contains no 'bars' array or it's empty.`, 'color: orange;');
-    }
-}
+})();
