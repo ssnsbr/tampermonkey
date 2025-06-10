@@ -1,95 +1,85 @@
 // request_listener.js
-// This file is loaded via @require in main.js
-// It exports an object 'RequestListener' to the global scope.
 
-(function() {
-    'use strict';
+const RequestListener = (() => {
+    let originalFetch = null;
+    let originalXHR = null;
+    let dataCallback = null;
 
-    const RequestListener = {
-        /**
-         * Fetches data from a given URL using the Fetch API.
-         * @param {string} url - The URL to fetch data from.
-         * @param {function} callback - The function to call with the fetched data (as text).
-         * @returns {Promise<void>} - A promise that resolves when data is fetched or rejects on error.
-         */
-        fetchData: async function(url, callback) {
-            if (!url) {
-                console.error("RequestListener: No URL provided for fetchData.");
-                return Promise.reject("No URL provided.");
-            }
-            if (typeof callback !== 'function') {
-                console.error("RequestListener: No valid callback function provided for fetchData.");
-                return Promise.reject("No valid callback.");
-            }
+    function startListening(callback) {
+        dataCallback = callback;
 
-            console.log(`RequestListener: Fetching data from ${url}...`);
-            try {
-                const response = await fetch(url, {
-                    method: 'GET', // Or 'POST' if required
-                    headers: {
-                        'Accept': 'application/json', // Or other content types
-                        // Add any necessary custom headers here (e.g., API keys if required)
-                        // 'X-Custom-Header': 'YourValue'
-                    },
-                    // credentials: 'omit', // 'omit', 'same-origin', 'include'
-                });
+        // Intercept Fetch API
+        if (typeof window.fetch === 'function' && !originalFetch) {
+            originalFetch = window.fetch;
+            window.fetch = async function(...args) {
+                const response = await originalFetch.apply(this, args);
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP error! Status: ${response.status}, Message: ${errorText}`);
+                // Clone the response so we can read its body without affecting the original
+                const clonedResponse = response.clone();
+
+                // IMPORTANT: Your existing logic to filter relevant fetch responses goes here.
+                // Example: if (args[0].includes('chart_data_endpoint')) { ... }
+                // Check content type if needed
+                if (clonedResponse.ok && clonedResponse.headers.get('content-type')?.includes('application/json')) {
+                    try {
+                        const data = await clonedResponse.text(); // Get raw text to pass to callback
+                        // Pass the raw response data to the registered callback in main.js
+                        if (dataCallback) {
+                            dataCallback(data);
+                        }
+                    } catch (e) {
+                        console.error('RequestListener: Error reading fetch response body:', e);
+                    }
                 }
-
-                const rawData = await response.text(); // Get raw text, let DataProcessor parse it
-                callback(rawData);
-                console.log(`RequestListener: Data fetched successfully from ${url}.`);
-            } catch (error) {
-                console.error(`RequestListener: Failed to fetch data from ${url}:`, error);
-                throw error; // Re-throw to allow main.js to catch it
-            }
-        },
-
-        /**
-         * Sends data to a given URL using a POST request.
-         * @param {string} url - The URL to send data to.
-         * @param {object} payload - The data object to send (will be JSON.stringified).
-         * @returns {Promise<any>} - A promise that resolves with the response data (parsed JSON) or rejects on error.
-         */
-        sendData: async function(url, payload) {
-            if (!url || !payload) {
-                console.error("RequestListener: URL or payload missing for sendData.");
-                return Promise.reject("URL or payload missing.");
-            }
-
-            console.log(`RequestListener: Sending data to ${url}...`, payload);
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        // Add any necessary custom headers here
-                    },
-                    body: JSON.stringify(payload),
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP error! Status: ${response.status}, Message: ${errorText}`);
-                }
-
-                // Assuming the response is JSON, parse it
-                const responseData = await response.json();
-                console.log(`RequestListener: Data sent successfully to ${url}. Response:`, responseData);
-                return responseData;
-            } catch (error) {
-                console.error(`RequestListener: Failed to send data to ${url}:`, error);
-                throw error;
-            }
+                return response;
+            };
+            console.log('RequestListener: Fetch API interception active.');
         }
-        // You can add more specific request functions here (e.g., for specific API calls)
+
+        // Intercept XMLHttpRequest
+        if (typeof window.XMLHttpRequest === 'function' && !originalXHR) {
+            originalXHR = window.XMLHttpRequest;
+            window.XMLHttpRequest = function() {
+                const xhr = new originalXHR();
+
+                xhr.addEventListener('load', function() {
+                    // IMPORTANT: Your existing logic to filter relevant XHR responses goes here.
+                    // Example: if (xhr.responseURL.includes('historical_data_endpoint')) { ... }
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        // Check content type if needed
+                        const contentType = xhr.getResponseHeader('Content-Type');
+                        if (contentType && contentType.includes('application/json')) {
+                            // Pass the raw response text to the registered callback in main.js
+                            if (dataCallback) {
+                                dataCallback(xhr.responseText);
+                            }
+                        }
+                    }
+                });
+
+                // Add other event listeners (error, etc.) if useful for debugging
+                return xhr;
+            };
+            console.log('RequestListener: XMLHttpRequest interception active.');
+        }
+    }
+
+    function stopListening() {
+        if (originalFetch) {
+            window.fetch = originalFetch;
+            originalFetch = null;
+            console.log('RequestListener: Fetch API interception stopped.');
+        }
+        if (originalXHR) {
+            window.XMLHttpRequest = originalXHR;
+            originalXHR = null;
+            console.log('RequestListener: XMLHttpRequest interception stopped.');
+        }
+        dataCallback = null;
+    }
+
+    return {
+        startListening: startListening,
+        stopListening: stopListening,
     };
-
-    // Expose RequestListener to the global scope
-    window.RequestListener = RequestListener;
-
 })();
