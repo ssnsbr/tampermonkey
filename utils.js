@@ -85,3 +85,26 @@ function convertToCSV(data) {
     console.log(`[Utils] convertToCSV: Generated ${csvRows.length} CSV rows.`);
     return csvRows.join('\n');
 }
+
+/**
+ * Formats a number as USD with B/M/K suffixes or fixed decimals.
+ * @param {number} num The number to format.
+ * @param {number} [decimalPlaces=6] Optional: Number of decimal places for small numbers.
+ * @returns {string} The formatted string.
+ */
+function formatUSD(num, decimalPlaces = 6) {
+    if (typeof num !== 'number' || isNaN(num)) {
+        return "N/A";
+    }
+    if (num >= 1000000000) { // Billions
+        return "$" + (num / 1e9).toFixed(2) + "B";
+    } else if (num >= 1000000) { // Millions
+        return "$" + (num / 1e6).toFixed(2) + "M";
+    } else if (num >= 1000) { // Thousands
+        return "$" + (num / 1e3).toFixed(2) + "K";
+    } else if (num >= 1) {
+        return "$" + num.toFixed(2); // For values between $1 and $1000
+    } else {
+        return "$" + num.toFixed(decimalPlaces); // For small values
+    }
+}
