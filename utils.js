@@ -1,74 +1,49 @@
 // utils.js
-// General utility functions
+// This file is loaded via @require in main.js
+// It exports an object 'Utils' to the global scope.
 
-console.log("[Utils] Initializing utils.js");
+(function() {
+    'use strict';
 
-/**
- * Formats a number as a USD currency string.
- * @param {number} amount The number to format.
- * @param {number} [decimalPlaces=2] The number of decimal places to include.
- * @returns {string} The formatted USD string.
- */
-function formatUSD(amount, decimalPlaces = 2) {
-    if (typeof amount !== 'number' || isNaN(amount)) {
-        return '$N/A';
-    }
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: decimalPlaces,
-        maximumFractionDigits: decimalPlaces
-    }).format(amount);
-}
+    const Utils = {
+        formatNumber: function(number, type = 'general') {
+            if (typeof number !== 'number') return 'N/A';
+            switch (type) {
+                case 'currency':
+                    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(number);
+                case 'compact_currency':
+                    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', compactDisplay: 'short' }).format(number);
+                case 'percentage':
+                    return new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 2 }).format(number);
+                case 'large_number':
+                    return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(number);
+                default:
+                    return number.toLocaleString();
+            }
+        },
 
-/**
- * Downloads data as a file.
- * @param {string} content The content of the file.
- * @param {string} filename The name of the file.
- * @param {string} mimeType The MIME type of the file (e.g., 'application/json', 'text/csv').
- */
-function downloadFile(content, filename, mimeType) {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a); // Required for Firefox
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    console.log(`[Utils] Downloaded file: ${filename}`);
-}
+        // Helper to download data as a JSON file
+        downloadDataAsJson: function(data, filename) {
+            const jsonStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        },
 
-/**
- * Converts an array of objects to a CSV string.
- * Assumes all objects have the same keys.
- * @param {Array<object>} data The array of objects to convert.
- * @returns {string} The CSV string.
- */
-function convertToCSV(data) {
-    if (!data || data.length === 0) {
-        return '';
-    }
+        // You can add other utility functions here:
+        // - Debounce/Throttle
+        // - Cookie handling
+        // - URL parameter parsing
+        // - Date/time formatting specific to your needs
+    };
 
-    const headers = Object.keys(data[0]);
-    const csvRows = [];
+    // Expose Utils to the global scope
+    window.Utils = Utils;
 
-    // Add headers
-    csvRows.push(headers.join(','));
-
-    // Add data rows
-    for (const row of data) {
-        const values = headers.map(header => {
-            const value = row[header];
-            // Handle null/undefined, and wrap strings with commas in quotes
-            const formattedValue = (value === null || value === undefined) ? '' : String(value);
-            return formattedValue.includes(',') || formattedValue.includes('"') || formattedValue.includes('\n')
-                   ? `"${formattedValue.replace(/"/g, '""')}"`
-                   : formattedValue;
-        });
-        csvRows.push(values.join(','));
-    }
-
-    return csvRows.join('\n');
-}
+})();
