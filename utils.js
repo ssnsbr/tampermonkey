@@ -1,207 +1,436 @@
-// ui.js
-// This file contains functions to create and manage the floating UI.
+
+// --- Utility Functions (formatUSD is now in utils.js) ---
+
+
 
 /**
- * Creates and appends a floating UI container.
- * It's now more generic to allow multiple content and button sections.
- * @param {object} sections An array of objects, each defining a section { id: string, title: string, elements: HTMLElement[], callbacks: object }.
- * callbacks: { onDownloadJson: Function, onDownloadPandas: Function } for each section.
- * @returns {HTMLElement} The created UI container.
- */
-function createFloatingUI(sections) {
-    // Main container for the floating UI
-    const uiContainer = document.createElement('div');
-    uiContainer.id = 'axiom-hud-container';
-    uiContainer.style.position = 'fixed';
-    uiContainer.style.top = '20px';
-    uiContainer.style.right = '20px';
-    uiContainer.style.width = '320px'; // Adjusted width for more content/buttons
-    uiContainer.style.backgroundColor = 'rgba(0,0,0,0.9)';
-    uiContainer.style.color = 'lime';
-    uiContainer.style.fontSize = '14px'; // Slightly smaller font for more info
-    uiContainer.style.fontFamily = 'monospace';
-    uiContainer.style.padding = '15px';
-    uiContainer.style.borderRadius = '8px';
-    uiContainer.style.boxShadow = '0 0 10px lime';
-    uiContainer.style.zIndex = '999999';
-    uiContainer.style.cursor = 'grab'; // Indicates it's draggable
-    uiContainer.style.resize = 'both'; // Allow resizing
-    uiContainer.style.overflow = 'auto'; // Add scrollbars if content overflows
-    uiContainer.style.maxHeight = '90vh'; // Prevent it from going off-screen vertically
 
-    // Header for moving the UI
-    const header = document.createElement('div');
-    header.style.textAlign = 'center';
-    header.style.fontWeight = 'bold';
-    header.style.marginBottom = '10px';
-    header.style.cursor = 'grab';
-    header.innerText = 'Axiom Token Data HUD';
-    uiContainer.appendChild(header);
+ * Processes a WebSocket 'trade' message and updates the live data state.
 
-    // Close button
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = 'X';
-    closeBtn.style.position = 'absolute';
-    closeBtn.style.top = '10px';
-    closeBtn.style.right = '10px';
-    closeBtn.style.background = 'none';
-    closeBtn.style.border = 'none';
-    closeBtn.style.color = 'lime';
-    closeBtn.style.fontSize = '16px';
-    closeBtn.style.cursor = 'pointer';
-    closeBtn.onclick = () => uiContainer.remove();
-    uiContainer.appendChild(closeBtn);
+ * This is for individual buy/sell transactions.
 
-    // Add sections dynamically
-    sections.forEach(section => {
-        const sectionDiv = document.createElement('div');
-        sectionDiv.id = section.id; // e.g., 'hud-live-data-section' or 'hud-chart-data-section'
-        sectionDiv.style.marginBottom = '20px';
-        sectionDiv.style.borderTop = '1px solid rgba(0,255,0,0.3)';
-        sectionDiv.style.paddingTop = '10px';
-        sectionDiv.style.position = 'relative'; // For title absolute positioning
+ * @param {object} content The 'content' part of the WebSocket message.
 
-        const sectionTitle = document.createElement('div');
-        sectionTitle.style.fontWeight = 'bold';
-        sectionTitle.style.color = 'lime';
-        sectionTitle.style.backgroundColor = 'rgba(0,0,0,0.9)';
-        sectionTitle.style.position = 'absolute';
-        sectionTitle.style.top = '-10px'; // Move title slightly above the border
-        sectionTitle.style.left = '50%';
-        sectionTitle.style.transform = 'translateX(-50%)';
-        sectionTitle.style.padding = '0 5px';
-        sectionTitle.textContent = section.title;
-        sectionDiv.appendChild(sectionTitle);
+ * @param {string} tokenId The ID of the token being monitored.
+
+ */
+
+function processTradeMessage(content, tokenId) {
+
+    // console.log("[DataProcessor] processTradeMessage called.");
+
+    // console.log("[DataProcessor] Incoming trade content:", content);
 
 
-        // Content area for dynamic data
-        const contentArea = document.createElement('div');
-        contentArea.id = `${section.id}-content`; // e.g., 'hud-live-data-section-content'
-        sectionDiv.appendChild(contentArea);
 
-        // Append the initial elements
-        section.elements.forEach(el => contentArea.appendChild(el));
+    const now = Date.now();
 
-        // Download Buttons container (if callbacks are provided)
-        if (section.callbacks && (section.callbacks.onDownloadJson || section.callbacks.onDownloadPandas)) {
-            const buttonContainer = document.createElement('div');
-            buttonContainer.style.marginTop = '15px';
-            buttonContainer.style.display = 'flex';
-            buttonContainer.style.gap = '10px';
-            buttonContainer.style.justifyContent = 'center';
+    const price = parseFloat(content.price_usd);
 
-            if (section.callbacks.onDownloadJson) {
-                const downloadJsonBtn = document.createElement('button');
-                downloadJsonBtn.textContent = 'Download JSON';
-                downloadJsonBtn.style.cssText = `
-                    background-color: #007bff;
-                    color: white;
-                    border: none;
-                    padding: 8px 12px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 13px;
-                `;
-                downloadJsonBtn.onmouseover = (e) => e.target.style.backgroundColor = '#0056b3';
-                downloadJsonBtn.onmouseout = (e) => e.target.style.backgroundColor = '#007bff';
-                downloadJsonBtn.onclick = section.callbacks.onDownloadJson;
-                buttonContainer.appendChild(downloadJsonBtn);
-            }
+    if (isNaN(price)) {
 
-            if (section.callbacks.onDownloadPandas) {
-                const downloadPandasBtn = document.createElement('button');
-                downloadPandasBtn.textContent = 'Download CSV'; // Renamed from Pandas for brevity
-                downloadPandasBtn.style.cssText = `
-                    background-color: #28a745;
-                    color: white;
-                    border: none;
-                    padding: 8px 12px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-size: 13px;
-                `;
-                downloadPandasBtn.onmouseover = (e) => e.target.style.backgroundColor = '#218838';
-                downloadPandasBtn.onmouseout = (e) => e.target.style.backgroundColor = '#28a745';
-                downloadPandasBtn.onclick = section.callbacks.onDownloadPandas;
-                buttonContainer.appendChild(downloadPandasBtn);
-            }
-            sectionDiv.appendChild(buttonContainer);
-        }
-        uiContainer.appendChild(sectionDiv);
-    });
+        console.warn("[DataProcessor] Invalid price_usd received in trade message:", content.price_usd);
+
+        return;
+
+    }
 
 
-    // Make the UI draggable
-    let isDragging = false;
-    let offsetX, offsetY;
 
-    header.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        offsetX = e.clientX - uiContainer.getBoundingClientRect().left;
-        offsetY = e.clientY - uiContainer.getBoundingClientRect().top;
-        uiContainer.style.cursor = 'grabbing';
-    });
+    // Use the dynamically updated token supply, fallback to default if not yet set
 
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        uiContainer.style.left = `${e.clientX - offsetX}px`;
-        uiContainer.style.top = `${e.clientY - offsetY}px`;
-    });
+    const currentSupply = dataState.tokenSupply;
 
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-        uiContainer.style.cursor = 'grab';
-    });
+    const marketCap = price * currentSupply;
 
-    document.body.appendChild(uiContainer);
-    return uiContainer;
+    const transactionValueUsd = parseFloat(content.total_usd) || 0;
+
+
+
+    // Store all trade events with their value and timestamp for dynamic volume calculation
+
+    dataState.txs.push({ ts: now, usd: transactionValueUsd });
+
+
+
+    // Keep txs array manageable (e.g., only keep last 24 hours of data for potential future use)
+
+    const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours in milliseconds
+
+    while (dataState.txs.length > 0 && dataState.txs[0].ts < oneDayAgo) {
+
+        dataState.txs.shift();
+
+    }
+
+
+
+    if (marketCap > dataState.athMarketCapSession) {
+
+        dataState.athMarketCapSession = marketCap;
+
+    }
+
+
+
+    dataState.lastPrice = price;
+
+    dataState.lastMarketCap = marketCap;
+
+
+
+    dataState.allTxData.push({
+
+        timestamp: new Date(now).toISOString(),
+
+        price_usd: price,
+
+        total_usd_transaction: transactionValueUsd,
+
+        pair_address: content.pair_address,
+
+        tx_hash: content.signature,
+
+        tx_type: content.type,
+
+        maker_address: content.maker_address,
+
+        liquidity_sol: content.liquidity_sol,
+
+        liquidity_token: content.liquidity_token
+
+    });
+
+    // console.log(`%c[DataProcessor] Trade DataState updated: Price=${formatUSD(dataState.lastPrice)}, MC=${formatUSD(dataState.lastMarketCap)}, Session ATH MC=${formatUSD(dataState.athMarketCapSession)}`, 'color: blue; font-weight: bold;');
+
 }
 
+
+
 /**
- * Updates the content of a specific HUD section.
- * @param {string} sectionId The ID of the section (e.g., 'hud-live-data-section').
- * @param {string} htmlContent The HTML string to set as the innerHTML of the content area.
- */
-function updateHUDContent(sectionId, htmlContent) {
-    const contentArea = document.getElementById(`${sectionId}-content`);
-    if (contentArea) {
-        contentArea.innerHTML = htmlContent;
-    }
+
+ * Processes a WebSocket 'update_pulse' message for a specific token.
+
+ * This updates general token stats and the global token supply.
+
+ * @param {object} tokenData The specific token object from the 'content' array.
+
+ */
+
+function processPulseMessage(tokenData) {
+
+    // console.log("[DataProcessor] Processing pulse message for token:", tokenData.tokenName);
+
+
+
+    // Update token supply if it's provided and valid
+
+    if (typeof tokenData.supply === 'number' && tokenData.supply > 0) {
+
+        dataState.tokenSupply = tokenData.supply;
+
+        // console.log(`[DataProcessor] Token Supply updated to: ${dataState.tokenSupply.toLocaleString()}`);
+
+    } else if (typeof tokenData.supply === 'string') { // Try parsing if it's a string
+
+        const parsedSupply = parseFloat(tokenData.supply);
+
+        if (!isNaN(parsedSupply) && parsedSupply > 0) {
+
+            dataState.tokenSupply = parsedSupply;
+
+            // console.log(`[DataProcessor] Token Supply (parsed) updated to: ${dataState.tokenSupply.toLocaleString()}`);
+
+        }
+
+    }
+
+
+
+
+
+    dataState.pulseMarketCapUSD = (parseFloat(tokenData.marketCapSol) || 0) * SOL_USD_PRICE;
+
+    dataState.pulseVolume24hUSD = (parseFloat(tokenData.volumeSol) || 0) * SOL_USD_PRICE;
+
+    dataState.numHolders = parseInt(tokenData.numHolders) || 0;
+
+    dataState.liquidityUSD = (parseFloat(tokenData.liquiditySol) || 0) * SOL_USD_PRICE;
+
+    dataState.pulseTimestamp = Date.now(); // Record when this data was last updated
+
+
+
+    // console.log(`%c[DataProcessor] Pulse DataState updated: MC=${formatUSD(dataState.pulseMarketCapUSD)}, Vol24h=${formatUSD(dataState.pulseVolume24hUSD)}, Holders=${dataState.numHolders}, Liq=${formatUSD(dataState.liquidityUSD)}`, 'color: darkviolet; font-weight: bold;');
+
 }
 
+
+
 /**
- * Processes raw chart data from an API response, filters for new bars,
- * adds them to the global allChartBars array, sorts the array, and updates the HUD.
- * @param {Array} bars The 'bars' array from the chart API response.
- * @param {boolean} noData A boolean indicating if the API returned no more data.
- * @param {Array} allChartBars The global array holding all collected chart bars. (Will be modified by reference)
- * @param {string} type The type of interception ('XHR' or 'Fetch') for logging purposes.
- */
-function processChartData(bars, noData, allChartBars, type) {
-    if (noData) {
-        console.log(`%c[Main][${type} Interception] Chart API response indicates no more data (noData: true).`, 'color: gray;');
-        return;
-    }
 
-    if (Array.isArray(bars) && bars.length > 0) {
-        const newBars = bars.filter(newBar =>
-            !allChartBars.some(existingBar => existingBar.time === newBar.time)
-        );
-        console.log(`%c[Main][${type} Interception] Found ${bars.length} bars in response. Adding ${newBars.length} new unique bars.`, 'color: teal;');
-        allChartBars.push(...newBars);
-        allChartBars.sort((a, b) => a.time - b.time); // Keep bars sorted by time
+ * Processes a WebSocket 'lighthouse' message.
 
-        console.log(`%c[Main][${type} Interception] Total unique chart bars collected: ${allChartBars.length}`, 'color: darkgreen; font-weight: bold;');
+ * This updates overall market metrics like total volume.
 
-        // Update HUD content for chart data section
-        const firstBarTime = allChartBars.length > 0 ? new Date(allChartBars[0].time).toLocaleString() : 'N/A';
-        const lastBarTime = allChartBars.length > 0 ? new Date(allChartBars[allChartBars.length - 1].time).toLocaleString() : 'N/A';
-        updateHUDContent('hud-chart-data-section', `
-            Collected Chart Bars: ${allChartBars.length}<br>
-            Range: ${firstBarTime}<br>
-            To: ${lastBarTime}
-        `);
-    } else {
-        console.warn(`%c[Main][${type} Interception] Chart API response contains no 'bars' array or it's empty.`, 'color: orange;');
-    }
+ * @param {object} content The 'content' part of the WebSocket message.
+
+ */
+
+function processLighthouseMessage(content) {
+
+    // console.log("[DataProcessor] Processing lighthouse message.");
+
+    if (content && content['5m'] && content['5m']['All']) {
+
+        const totalVolume = parseFloat(content['5m']['All'].totalVolume);
+
+        if (!isNaN(totalVolume)) {
+
+            dataState.lighthouse5mTotalVolume = totalVolume;
+
+            // console.log(`%c[DataProcessor] Lighthouse 5m Total Volume (All Protocols) updated: ${formatUSD(dataState.lighthouse5mTotalVolume)}`, 'color: #8B008B; font-weight: bold;');
+
+        }
+
+    }
+
+}
+
+
+
+/**
+
+ * Calculates and updates the All-Time High Market Cap from collected chart bars.
+
+ * This should be called whenever allChartBars is updated.
+
+ * @param {Array<object>} allChartBars The array of historical chart bars.
+
+ */
+
+function updateChartAthMarketCap(allChartBars) {
+
+    let maxChartMarketCap = 0;
+
+    if (Array.isArray(allChartBars) && allChartBars.length > 0) {
+
+        const maxPrice = Math.max(...allChartBars.map(bar => bar.high || 0));
+
+        // Use the dynamically updated token supply, fallback to default if not yet set
+
+        const currentSupply = dataState.tokenSupply;
+
+        maxChartMarketCap = maxPrice * currentSupply;
+
+    }
+
+
+
+    if (maxChartMarketCap > dataState.chartAthMarketCap) {
+
+        dataState.chartAthMarketCap = maxChartMarketCap;
+
+        console.log(`%c[DataProcessor] Chart ATH Market Cap updated: ${formatUSD(dataState.chartAthMarketCap)}`, 'color: darkorange; font-weight: bold;');
+
+    }
+
+}
+
+
+
+/**
+
+ * Calculates the total volume (in USD) for a given timeframe from trade messages.
+
+ * @param {number} minutes The timeframe in minutes (e.g., 1, 5).
+
+ * @returns {number} The total volume in USD for the specified timeframe.
+
+ */
+
+function getVolumeForTimeframe(minutes) {
+
+    const now = Date.now();
+
+    const timeframeMillis = minutes * 60 * 1000;
+
+    const cutoffTime = now - timeframeMillis;
+
+
+
+    return dataState.txs
+
+        .filter(tx => tx.ts >= cutoffTime)
+
+        .reduce((sum, tx) => sum + tx.usd, 0);
+
+}
+
+
+
+/**
+
+ * Gets the current formatted data for display in the HUD.
+
+ * @param {string} tokenId The ID of the token.
+
+ * @returns {string} HTML string with formatted data.
+
+ */
+
+function getFormattedHUDData(tokenId) {
+
+    const { lastPrice, lastMarketCap, athMarketCapSession,
+
+            pulseMarketCapUSD, pulseVolume24hUSD, numHolders, liquidityUSD,
+
+            chartAthMarketCap, tokenSupply, lighthouse5mTotalVolume } = dataState;
+
+
+
+    const volume1m = getVolumeForTimeframe(1);
+
+    const volume5m = getVolumeForTimeframe(5);
+
+
+
+    let liveTradeHtml = '';
+
+    if (lastPrice !== 0) {
+
+        liveTradeHtml = `
+
+            <b>Current Price:</b> ${formatUSD(lastPrice, 6)}<br>
+
+            <b>Live Market Cap (Trades):</b> ${formatUSD(lastMarketCap)}<br>
+
+            <b>Volume (1m / Trades):</b> ${formatUSD(volume1m)}<br>
+
+            <b>Volume (5m / Trades):</b> ${formatUSD(volume5m)}<br>
+
+            <b>Session ATH MC (Trades):</b> ${formatUSD(athMarketCapSession)}
+
+        `;
+
+    } else {
+
+        liveTradeHtml = `Loading live trade data...`;
+
+    }
+
+
+
+    let pulseDataHtml = '';
+
+    if (pulseMarketCapUSD !== 0) {
+
+        pulseDataHtml = `
+
+            <b>24h Market Cap (Pulse):</b> ${formatUSD(pulseMarketCapUSD, 2)}<br>
+
+            <b>24h Total Volume (Pulse):</b> ${formatUSD(pulseVolume24hUSD, 2)}<br>
+
+            <b>Holders:</b> ${numHolders.toLocaleString()}<br>
+
+            <b>Liquidity:</b> ${formatUSD(liquidityUSD, 2)}
+
+        `;
+
+    } else {
+
+        pulseDataHtml = `Loading token pulse data...`;
+
+    }
+
+
+
+    let overallMarketHtml = '';
+
+    if (lighthouse5mTotalVolume !== 0) {
+
+        overallMarketHtml = `
+
+            <b>Overall Market 5m Volume:</b> ${formatUSD(lighthouse5mTotalVolume, 2)}
+
+        `;
+
+    } else {
+
+        overallMarketHtml = `Loading overall market data...`;
+
+    }
+
+
+
+    return `
+
+        <b>Token ID:</b> ${tokenId}<br>
+
+        <b>Total Supply:</b> ${tokenSupply.toLocaleString()}<br><br>
+
+        ${liveTradeHtml}<br><br>
+
+        ${pulseDataHtml}<br><br>
+
+        ${overallMarketHtml}<br><br>
+
+        <b>Chart ATH MC:</b> ${formatUSD(chartAthMarketCap)}
+
+    `;
+
+}
+
+
+
+/**
+
+ * Gets all collected transaction data.
+
+ * @returns {Array<object>} An array of raw transaction objects.
+
+ */
+
+function getAllTransactionData() {
+
+    console.log(`[DataProcessor] Providing all live transaction data. Count: ${dataState.allTxData.length}`);
+
+    return dataState.allTxData;
+
+}
+
+
+
+/**
+
+ * Gets the current All-Time High Market Cap from chart data.
+
+ * @returns {number} The chart ATH Market Cap.
+
+ */
+
+function getChartAthMarketCap() {
+
+    return dataState.chartAthMarketCap;
+
+}
+
+
+
+// You can add a setter for SOL_USD_PRICE if you plan to fetch it dynamically
+
+function setSolUsdPrice(price) {
+
+    if (typeof price === 'number' && !isNaN(price) && price > 0) {
+
+        SOL_USD_PRICE = price;
+
+        console.log(`%c[DataProcessor] SOL_USD_PRICE updated to: $${SOL_USD_PRICE}`, 'color: green;');
+
+    } else {
+
+        console.warn("[DataProcessor] Attempted to set invalid SOL_USD_PRICE:", price);
+
+    }
+
 }
