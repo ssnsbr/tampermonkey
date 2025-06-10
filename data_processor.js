@@ -241,9 +241,11 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
             overallMarketHtml = `Loading overall market data...`;
         }
 
+        //    <b>Token ID:</b> ${tokenId}<br>
+//             <b>Total Supply:</b> ${tokenSupply.toLocaleString()}<br><br>
+
         return `
-            <b>Token ID:</b> ${tokenId}<br>
-            <b>Total Supply:</b> ${tokenSupply.toLocaleString()}<br><br>
+        
             ${liveTradeHtml}<br><br>
             ${pulseDataHtml}<br><br>
             ${overallMarketHtml}
