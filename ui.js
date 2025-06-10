@@ -1,79 +1,82 @@
 // ui.js
-// This file is loaded via @require in main.js
-// It exports an object 'UI' to the global scope.
 
-(function() {
-    'use strict';
+const UI_Manager = (() => {
+    let hudContainer; // Reference to the main HUD container
 
-    const HUD_ID = 'axiom-token-hud';
-    let hudElement = null;
+    // Function to create and append the initial HUD structure
+    function init() {
+        if (hudContainer) return; // Prevent re-initialization
 
-    const UI = {
-        initHUD: function() {
-            // Create the main HUD container if it doesn't exist
-            hudElement = document.createElement('div');
-            hudElement.id = HUD_ID;
-            hudElement.style.cssText = `
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                background-color: rgba(0, 0, 0, 0.7);
-                color: white;
-                padding: 10px;
-                border-radius: 8px;
-                font-family: sans-serif;
-                z-index: 9999;
-                max-width: 300px;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            `;
-            hudElement.innerHTML = `
-                <h3>Axiom Token Stats</h3>
-                <p>Market Cap: <span id="hud-market-cap">Loading...</span></p>
-                <p>Volume (24h): <span id="hud-volume">Loading...</span></p>
-                <p>ATH: <span id="hud-ath">Loading...</span></p>
-                <button id="download-chart-data" style="margin-top: 10px; padding: 5px 10px;">Download Chart Data</button>
-            `;
-            document.body.appendChild(hudElement);
+        hudContainer = document.createElement('div');
+        hudContainer.id = 'axiom-token-hud';
+        // Add basic styling for positioning, etc.
+        hudContainer.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(30, 30, 30, 0.9);
+            color: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 10000;
+            font-family: sans-serif;
+            font-size: 14px;
+        `;
 
-            // Attach event listener for the download button (example)
-            document.getElementById('download-chart-data').addEventListener('click', () => {
-                const downloadData = DataProcessor.getCollectedChartData(); // Assuming DataProcessor stores this
-                const tokenId = window.location.pathname.split('/').pop(); // Simple way to get token ID
-                Utils.downloadDataAsJson(downloadData, `${tokenId}_chart_data_${new Date().toISOString().slice(0,10)}.json`);
-                alert('Downloading chart data...');
-            });
-        },
+        hudContainer.innerHTML = `
+            <h3>Token Stats</h3>
+            <p>Market Cap: <span id="hud-marketcap">Loading...</span></p>
+            <p>Volume (24h): <span id="hud-volume">Loading...</span></p>
+            <p>ATH: <span id="hud-ath">Loading...</span></p>
+            <button id="downloadChartDataBtn">Download Chart Data</button>
+            <div id="chart-data-status"></div>
+        `;
 
-        updateHUD: function(data) {
-            // Update the HUD with new data
-            if (!hudElement) return;
+        document.body.appendChild(hudContainer);
 
-            const marketCapSpan = hudElement.querySelector('#hud-market-cap');
-            const volumeSpan = hudElement.querySelector('#hud-volume');
-            const athSpan = hudElement.querySelector('#hud-ath');
+        // Attach event listener for the download button (example)
+        // This assumes main.js will provide the data for download
+        // document.getElementById('downloadChartDataBtn').addEventListener('click', () => {
+        //     // This click event would trigger a function in main.js or pass a signal
+        //     // to get data from DataProcessor and then use Utils.downloadFile
+        //     console.log('Download chart data button clicked!');
+        //     // Example: You'd typically call a function passed from main.js or trigger a custom event
+        //     // to ask main.js to get the data and download it.
+        // });
+    }
 
-            if (data.marketCap !== undefined) {
-                marketCapSpan.textContent = Utils.formatNumber(data.marketCap, 'currency');
-            }
-            if (data.volume !== undefined) {
-                volumeSpan.textContent = Utils.formatNumber(data.volume, 'currency');
-            }
-            if (data.ath !== undefined) {
-                athSpan.textContent = Utils.formatNumber(data.ath, 'currency');
-            }
-        },
+    // Function to update the HUD with new data
+    function updateHUD(data) {
+        if (!hudContainer) {
+            init(); // Initialize if not already done (should be called from main.js)
+        }
 
-        // Example function for rendering a chart (if you implement one)
-        renderChart: function(chartData) {
-            console.log("UI: Rendering chart with data:", chartData);
-            // This is where you'd use a charting library like Chart.js or D3.js
-            // Or simply display processed historical data in a simple table.
-        },
+        const marketCapSpan = document.getElementById('hud-marketcap');
+        const volumeSpan = document.getElementById('hud-volume');
+        const athSpan = document.getElementById('hud-ath');
 
-        // You can add more UI-specific functions here, e.g., show/hide, error messages etc.
+        if (marketCapSpan && data.marketCap) {
+            marketCapSpan.textContent = data.marketCap; // Assumes data is already formatted
+        }
+        if (volumeSpan && data.volume) {
+            volumeSpan.textContent = data.volume; // Assumes data is already formatted
+        }
+        if (athSpan && data.ath) {
+            athSpan.textContent = data.ath; // Assumes data is already formatted
+        }
+    }
+
+    // Function to update chart data status or display messages
+    function updateChartDataStatus(message) {
+        const statusDiv = document.getElementById('chart-data-status');
+        if (statusDiv) {
+            statusDiv.textContent = message;
+        }
+    }
+
+    return {
+        init: init,
+        updateHUD: updateHUD,
+        updateChartDataStatus: updateChartDataStatus,
     };
-
-    // Expose UI to the global scope for main.js to use
-    window.UI = UI;
-
 })();
