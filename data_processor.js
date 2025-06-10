@@ -4,19 +4,20 @@
 console.log("[DataProcessor] Initializing data_processor.js");
 
 // --- Configuration ---
-const TOTAL_SUPPLY_BILLION = 1_000_000_000;
 // IMPORTANT: This SOL_USD_PRICE is a placeholder. You might need to fetch this dynamically
 // from another API (e.g., CoinGecko, CoinMarketCap) or find it on the Axiom page itself.
 let SOL_USD_PRICE = 150; // Placeholder: Assume 1 SOL = $150 USD for now
 
 // --- Data State ---
 const dataState = {
+    // General Token Info
+    tokenSupply: 1_000_000_000, // Default fallback, will be updated by pulse message if available
+
     // Live Trade Data (from WebSocket 'trade' messages)
     lastPrice: 0,           // Last known price in USD from trade messages
     lastMarketCap: 0,       // Last calculated market cap in USD from trade messages (price * supply)
-    volume24h: 0,           // Sum of transaction USD values over 24 hours from trade messages
     athMarketCapSession: 0, // All-Time High Market Cap observed in current session from trade messages
-    txs: [],                // Stores { ts: timestamp, usd: transaction_value } for 24h volume calc
+    txs: [],                // Stores { ts: timestamp, usd: transaction_value } for *dynamic* volume calculations
     allTxData: [],          // To store all raw processed trade data for download
 
     // Pulse Data (from WebSocket 'update_pulse' messages)
@@ -30,30 +31,7 @@ const dataState = {
     chartAthMarketCap: 0    // All-Time High Market Cap calculated from historical chart data
 };
 
-// --- Utility Functions ---
-
-/**
- * Formats a number as USD with M/K suffixes or fixed decimals.
- * @param {number} num The number to format.
- * @param {number} [decimalPlaces=6] Optional: Number of decimal places for small numbers.
- * @returns {string} The formatted string.
- */
-function formatUSD(num, decimalPlaces = 6) {
-    if (typeof num !== 'number' || isNaN(num)) {
-        return "N/A";
-    }
-    if (num >= 1000000000) { // Billions
-        return "$" + (num / 1e9).toFixed(2) + "B";
-    } else if (num >= 1000000) { // Millions
-        return "$" + (num / 1e6).toFixed(2) + "M";
-    } else if (num >= 1000) { // Thousands
-        return "$" + (num / 1e3).toFixed(2) + "K";
-    } else if (num >= 1) {
-        return "$" + num.toFixed(2); // For values between $1 and $1000
-    } else {
-        return "$" + num.toFixed(decimalPlaces); // For small values
-    }
-}
+// --- Utility Functions (Removed formatUSD from here) ---
 
 /**
  * Processes a WebSocket 'trade' message and updates the live data state.
@@ -72,15 +50,19 @@ function processTradeMessage(content, tokenId) {
         return;
     }
 
-    const marketCap = price * TOTAL_SUPPLY_BILLION;
+    // Use the dynamically updated token supply, fallback to default if not yet set
+    const currentSupply = dataState.tokenSupply;
+    const marketCap = price * currentSupply;
     const transactionValueUsd = parseFloat(content.total_usd) || 0;
 
+    // Store all trade events with their value and timestamp for dynamic volume calculation
     dataState.txs.push({ ts: now, usd: transactionValueUsd });
-    const oneDayAgo = now - 86400000;
-    while (dataState.txs.length && dataState.txs[0].ts < oneDayAgo) {
+
+    // Keep txs array manageable (e.g., only keep last 24 hours of data for potential future use)
+    const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours in milliseconds
+    while (dataState.txs.length > 0 && dataState.txs[0].ts < oneDayAgo) {
         dataState.txs.shift();
     }
-    dataState.volume24h = dataState.txs.reduce((sum, tx) => sum + tx.usd, 0);
 
     if (marketCap > dataState.athMarketCapSession) {
         dataState.athMarketCapSession = marketCap;
@@ -100,16 +82,29 @@ function processTradeMessage(content, tokenId) {
         liquidity_sol: content.liquidity_sol,
         liquidity_token: content.liquidity_token
     });
-    // console.log(`%c[DataProcessor] Trade DataState updated: Price=${formatUSD(dataState.lastPrice)}, MC=${formatUSD(dataState.lastMarketCap)}, Vol24h=${formatUSD(dataState.volume24h)}, Session ATH MC=${formatUSD(dataState.athMarketCapSession)}`, 'color: blue; font-weight: bold;');
+    // console.log(`%c[DataProcessor] Trade DataState updated: Price=${formatUSD(dataState.lastPrice)}, MC=${formatUSD(dataState.lastMarketCap)}, Session ATH MC=${formatUSD(dataState.athMarketCapSession)}`, 'color: blue; font-weight: bold;');
 }
 
 /**
  * Processes a WebSocket 'update_pulse' message for a specific token.
- * This updates general token stats.
+ * This updates general token stats and the global token supply.
  * @param {object} tokenData The specific token object from the 'content' array.
  */
 function processPulseMessage(tokenData) {
     // console.log("[DataProcessor] Processing pulse message for token:", tokenData.tokenName);
+
+    // Update token supply if it's provided and valid
+    if (typeof tokenData.supply === 'number' && tokenData.supply > 0) {
+        dataState.tokenSupply = tokenData.supply;
+        // console.log(`[DataProcessor] Token Supply updated to: ${dataState.tokenSupply.toLocaleString()}`);
+    } else if (typeof tokenData.supply === 'string') { // Try parsing if it's a string
+        const parsedSupply = parseFloat(tokenData.supply);
+        if (!isNaN(parsedSupply) && parsedSupply > 0) {
+            dataState.tokenSupply = parsedSupply;
+            // console.log(`[DataProcessor] Token Supply (parsed) updated to: ${dataState.tokenSupply.toLocaleString()}`);
+        }
+    }
+
 
     dataState.pulseMarketCapUSD = (parseFloat(tokenData.marketCapSol) || 0) * SOL_USD_PRICE;
     dataState.pulseVolume24hUSD = (parseFloat(tokenData.volumeSol) || 0) * SOL_USD_PRICE;
@@ -129,7 +124,9 @@ function updateChartAthMarketCap(allChartBars) {
     let maxChartMarketCap = 0;
     if (Array.isArray(allChartBars) && allChartBars.length > 0) {
         const maxPrice = Math.max(...allChartBars.map(bar => bar.high || 0));
-        maxChartMarketCap = maxPrice * TOTAL_SUPPLY_BILLION;
+        // Use the dynamically updated token supply, fallback to default if not yet set
+        const currentSupply = dataState.tokenSupply;
+        maxChartMarketCap = maxPrice * currentSupply;
     }
 
     if (maxChartMarketCap > dataState.chartAthMarketCap) {
@@ -139,24 +136,41 @@ function updateChartAthMarketCap(allChartBars) {
 }
 
 /**
+ * Calculates the total volume (in USD) for a given timeframe from trade messages.
+ * @param {number} minutes The timeframe in minutes (e.g., 1, 5).
+ * @returns {number} The total volume in USD for the specified timeframe.
+ */
+function getVolumeForTimeframe(minutes) {
+    const now = Date.now();
+    const timeframeMillis = minutes * 60 * 1000;
+    const cutoffTime = now - timeframeMillis;
+
+    return dataState.txs
+        .filter(tx => tx.ts >= cutoffTime)
+        .reduce((sum, tx) => sum + tx.usd, 0);
+}
+
+/**
  * Gets the current formatted data for display in the HUD.
  * @param {string} tokenId The ID of the token.
  * @returns {string} HTML string with formatted data.
  */
 function getFormattedHUDData(tokenId) {
-    const { lastPrice, lastMarketCap, volume24h, athMarketCapSession,
+    const { lastPrice, lastMarketCap, athMarketCapSession,
             pulseMarketCapUSD, pulseVolume24hUSD, numHolders, liquidityUSD,
-            chartAthMarketCap } = dataState;
+            chartAthMarketCap, tokenSupply } = dataState;
 
-    // console.log(`[DataProcessor] getFormattedHUDData called.`);
+    const volume1m = getVolumeForTimeframe(1);
+    const volume5m = getVolumeForTimeframe(5);
 
     let liveTradeHtml = '';
     if (lastPrice !== 0) {
         liveTradeHtml = `
             <b>Current Price:</b> ${formatUSD(lastPrice, 6)}<br>
-            <b>Live Market Cap (Trades):</b> ${formatUSD(lastMarketCap)}<br>
-            <b>24h Live Volume (Trades):</b> ${formatUSD(volume24h)}<br>
-            <b>Session ATH MC (Trades):</b> ${formatUSD(athMarketCapSession)}
+            <b>Live Market Cap:</b> ${formatUSD(lastMarketCap)}<br>
+            <b>Volume (1m):</b> ${formatUSD(volume1m)}<br>
+            <b>Volume (5m):</b> ${formatUSD(volume5m)}<br>
+            <b>Session ATH MC:</b> ${formatUSD(athMarketCapSession)}
         `;
     } else {
         liveTradeHtml = `Loading live trade data...`;
@@ -165,8 +179,8 @@ function getFormattedHUDData(tokenId) {
     let pulseDataHtml = '';
     if (pulseMarketCapUSD !== 0) {
         pulseDataHtml = `
-            <b>24h Market Cap:</b> ${formatUSD(pulseMarketCapUSD, 2)}<br>
-            <b>24h Total Volume:</b> ${formatUSD(pulseVolume24hUSD, 2)}<br>
+            <b>24h Market Cap (Pulse):</b> ${formatUSD(pulseMarketCapUSD, 2)}<br>
+            <b>24h Total Volume (Pulse):</b> ${formatUSD(pulseVolume24hUSD, 2)}<br>
             <b>Holders:</b> ${numHolders.toLocaleString()}<br>
             <b>Liquidity:</b> ${formatUSD(liquidityUSD, 2)}
         `;
@@ -175,9 +189,10 @@ function getFormattedHUDData(tokenId) {
     }
 
     return `
-        <b>Token:</b> ${tokenId}<br>
-        ${liveTradeHtml}<br>
-        ${pulseDataHtml}<br>
+        <b>Token ID:</b> ${tokenId}<br>
+        <b>Total Supply:</b> ${tokenSupply.toLocaleString()}<br><br>
+        ${liveTradeHtml}<br><br>
+        ${pulseDataHtml}<br><br>
         <b>Chart ATH MC:</b> ${formatUSD(chartAthMarketCap)}
     `;
 }
@@ -204,10 +219,7 @@ function setSolUsdPrice(price) {
     if (typeof price === 'number' && !isNaN(price) && price > 0) {
         SOL_USD_PRICE = price;
         console.log(`%c[DataProcessor] SOL_USD_PRICE updated to: $${SOL_USD_PRICE}`, 'color: green;');
-        // Recalculate pulse data to reflect new SOL price if desired, or wait for next pulse
-        // For simplicity, we'll let the next pulse message update these values
     } else {
         console.warn("[DataProcessor] Attempted to set invalid SOL_USD_PRICE:", price);
     }
 }
-
