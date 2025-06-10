@@ -16,6 +16,14 @@ const dataState = {
     chartAthMarketCap: 0 // All-Time High Market Cap calculated from historical chart data
 };
 
+/**
+ * Gets the current All-Time High Market Cap from chart data.
+ * @returns {number} The chart ATH Market Cap.
+ */
+function getChartAthMarketCap() {
+    return dataState.chartAthMarketCap;
+}
+
 // Assuming a fixed total supply of 1 billion tokens for Market Cap calculation
 const TOTAL_SUPPLY_BILLION = 1_000_000_000;
 
