@@ -5,30 +5,27 @@ const DataProcessor = (() => {
 
     // Processes raw WebSocket data
     function processWebSocketData(rawData) {
-        // IMPORTANT: Log the raw data first to understand its structure
-        console.log('DataProcessor: Received raw WebSocket data:', rawData);
+        // Only log when parsing, not for every received raw message, as it's now filtered upstream.
+        // console.log('DataProcessor: Received raw WebSocket data:', rawData); // <--- REMOVED THIS LINE
 
         try {
             const data = JSON.parse(rawData);
-            console.log('DataProcessor: Parsed WebSocket data:', data);
+            // console.log('DataProcessor: Parsed WebSocket data:', data); // <--- Optionally remove/comment this too if you only want to see the final extracted values
 
             // Assuming the structure for these keys. ADJUST THESE PATHS based on your actual data!
-            // If data.marketCap is nested, e.g., data.metrics.marketCap, you MUST change this.
-            const marketCap = data.marketCap || data.mc || data.market_cap; // Example: Try common key names
+            const marketCap = data.marketCap || data.mc || data.market_cap;
             const volume = data.volume24h || data.vol || data.volume_24h;
             const ath = data.allTimeHigh || data.ath || data.all_time_high;
 
-            console.log('DataProcessor: Extracted values - MarketCap:', marketCap, 'Volume:', volume, 'ATH:', ath);
+            // console.log('DataProcessor: Extracted values - MarketCap:', marketCap, 'Volume:', volume, 'ATH:', ath); // <--- Optionally keep this for key info
 
-            // Use Utils to format numbers. Utils.formatNumber will now handle NaN gracefully.
             return {
                 marketCap: Utils.formatNumber(marketCap, { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-                volume: Utils.formatNumber(volume, { style: 'currency', currency: 'USD', compact: true, minimumFractionDigits: 0, maximumFractionDigits: 2 }), // Adjusted compact options
+                volume: Utils.formatNumber(volume, { style: 'currency', currency: 'USD', compact: true, minimumFractionDigits: 0, maximumFractionDigits: 2 }),
                 ath: Utils.formatNumber(ath, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             };
         } catch (e) {
             console.error('DataProcessor: Error parsing or processing WebSocket data:', e, 'Raw Data:', rawData);
-            // Return default/fallback data if parsing fails
             return {
                 marketCap: '---',
                 volume: '---',
@@ -38,21 +35,27 @@ const DataProcessor = (() => {
     }
 
     // Processes raw data from HTTP requests (e.g., historical chart data)
-    function processRequestData(rawData) {
-        console.log('DataProcessor: Received raw Request data:', rawData);
+    function processRequestData(rawData, requestUrl) { // Added requestUrl for context
+        // We will remove the general raw data logging from here too.
+        // If you only want to log *specific* request data, you'll need filtering logic here.
+        // console.log('DataProcessor: Received raw Request data:', rawData); // <--- REMOVED THIS LINE
+
         try {
             const data = JSON.parse(rawData);
-            console.log('DataProcessor: Parsed Request data:', data);
+            // console.log('DataProcessor: Parsed Request data for URL:', requestUrl, data); // <--- Keep this if you want to see parsed data from specific requests
 
-            // Example: Assuming data is an array of chart points { timestamp, price }
-            if (Array.isArray(data)) {
-                // Deduplicate or sort if necessary if new data overlaps with existing
-                historicalChartData = [...new Set([...historicalChartData, ...data])]; // Simple deduplication
-                console.log('DataProcessor: Updated historical chart data. Total points:', historicalChartData.length);
+            // Example: Only process/log data from specific URLs for historical data
+            if (requestUrl && requestUrl.includes('/some/chart/history/endpoint')) {
+                if (Array.isArray(data)) {
+                    historicalChartData = [...new Set([...historicalChartData, ...data])];
+                    console.log('DataProcessor: Updated historical chart data. Total points:', historicalChartData.length);
+                }
             }
-            return data; // Return the raw processed data for further use if needed
+            // Otherwise, don't log or store data you don't care about
+
+            return data; // Return the raw processed data for further use if needed, but not all of it will be stored/logged
         } catch (e) {
-            console.error('DataProcessor: Error parsing request data:', e, 'Raw Data:', rawData);
+            console.error('DataProcessor: Error parsing request data for URL:', requestUrl, e, 'Raw Data:', rawData);
             return null;
         }
     }
