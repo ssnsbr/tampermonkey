@@ -1,118 +1,95 @@
 // request_listener.js
 
 const RequestListener = (() => {
+    let originalXHRopen = null;
+    let originalXHRsend = null;
     let originalFetch = null;
-    let originalXHR = null;
-    let dataCallback = null;
+    let responseCallback = null; // Callback for processed response data
 
     function startListening(callback) {
-        dataCallback = callback;
-
-        // Intercept Fetch API using Proxy
-        if (typeof window.fetch === 'function' && !originalFetch) {
-            originalFetch = window.fetch;
-            window.fetch = new Proxy(originalFetch, {
-                async apply(target, thisArg, args) {
-                    const url = args[0] instanceof Request ? args[0].url : String(args[0]); // Get the request URL
-
-                    const response = await Reflect.apply(target, thisArg, args);
-                    const clonedResponse = response.clone();
-
-                    // Inside RequestListener.js, within the fetch apply method:
-// ...
-                    const clonedResponse = response.clone();
-                    // NEW: Skip known problematic URLs for processing
-                    if (url.includes('lax1.secure.nozomi.temporal.xyz/ping')) {
-                        console.debug('RequestListener: Skipping processing for known problematic URL (ping).');
-                        return response; // Immediately return without processing/logging
-                    }
-
-                    if (clonedResponse.ok && clonedResponse.headers.get('content-type')?.includes('application/json')) {
-// ...
-
-// Inside RequestListener.js, within the XHR load event listener:
-// ...
-                    const url = this.responseURL;
-                    // NEW: Skip known problematic URLs for processing
-                    if (url.includes('lax1.secure.nozomi.temporal.xyz/ping')) {
-                        console.debug('RequestListener: Skipping processing for known problematic URL (ping).');
-                        return; // Immediately return without processing/logging
-                    }
-
-                    if (this.readyState === 4 && this.status === 200) {
-                        const contentType = this.getResponseHeader('Content-Type');
-                        if (contentType && contentType.includes('application/json')) {
-// ...
-
-                    // You can add filtering here based on the URL or response headers
-                    // For example, only process/log responses from specific endpoints
-                    // if (!url.includes('/api/v1/some-specific-data')) {
-                    //     return response; // Skip processing/logging for irrelevant requests
-                    // }
-
-                    if (clonedResponse.ok && clonedResponse.headers.get('content-type')?.includes('application/json')) {
-                        try {
-                            const data = await clonedResponse.text();
-                            if (dataCallback) {
-                                // Pass the URL along with the data
-                                dataCallback(data, url);
-                            }
-                        } catch (e) {
-                            console.error('RequestListener: Error reading fetch response body for URL:', url, e);
-                        }
-                    }
-                    return response;
-                }
-            });
-            console.log('RequestListener: Proxy-based Fetch API interception active.');
+        if (originalXHRopen || originalFetch) {
+            console.warn('[RequestListener] RequestListener already started.');
+            return;
         }
 
-        // Intercept XMLHttpRequest using Proxy
-        if (typeof window.XMLHttpRequest === 'function' && !originalXHR) {
-            originalXHR = window.XMLHttpRequest;
+        responseCallback = callback;
 
-            window.XMLHttpRequest = new Proxy(originalXHR, {
-                construct(target, args) {
-                    const xhr = new target(...args);
+        // XHR Interception
+        originalXHRopen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url) {
+            this._url = url; // Store the URL
+            return originalXHRopen.apply(this, arguments);
+        };
 
-                    xhr.addEventListener('load', function() {
-                        const url = this.responseURL; // Get the response URL
-
-                        // You can add filtering here based on the URL
-                        // if (!url.includes('/api/v1/another-specific-data')) {
-                        //     return; // Skip processing/logging for irrelevant XHRs
-                        // }
-
-                        if (this.readyState === 4 && this.status === 200) {
-                            const contentType = this.getResponseHeader('Content-Type');
-                            if (contentType && contentType.includes('application/json')) {
-                                if (dataCallback) {
-                                    // Pass the URL along with the data
-                                    dataCallback(this.responseText, url);
-                                }
-                            }
-                        }
-                    });
-
-                    return xhr;
+        originalXHRsend = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.send = function(body) {
+            this.addEventListener('load', function() {
+                if (this.readyState === 4 && this.status >= 200 && this.status < 300 && responseCallback) {
+                    try {
+                        const data = JSON.parse(this.responseText);
+                        responseCallback(this._url, data, 'XHR');
+                    } catch (e) {
+                        // Suppress logs for non-JSON or irrelevant XHR responses to keep console clean
+                    }
                 }
             });
-            console.log('RequestListener: Proxy-based XMLHttpRequest interception active.');
-        }
+            return originalXHRsend.apply(this, arguments);
+        };
+        console.log('[RequestListener] Proxy-based XMLHttpRequest interception active.');
+
+
+        // Fetch Interception
+        originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            const [resource] = args;
+            let requestUrl = null;
+
+            if (typeof resource === 'string') {
+                requestUrl = resource;
+            } else if (resource instanceof Request) {
+                requestUrl = resource.url;
+            } else if (resource instanceof URL) {
+                requestUrl = resource.href;
+            }
+
+            try {
+                const response = await originalFetch.apply(this, args);
+                if (!response.ok) {
+                    // Suppress logs for non-OK responses to keep console clean
+                    return response; // Return original response if not OK
+                }
+                const clone = response.clone();
+                if (responseCallback) {
+                    try {
+                        const data = await clone.json();
+                        responseCallback(requestUrl, data, 'Fetch');
+                    } catch (e) {
+                        // Suppress logs for non-JSON or irrelevant fetch responses to keep console clean
+                    }
+                }
+                return response; // Return original response
+            } catch (error) {
+                // Suppress network errors unless critical for debugging
+                throw error; // Re-throw the error
+            }
+        };
+        console.log('[RequestListener] Proxy-based Fetch API interception active.');
     }
 
     function stopListening() {
-        if (originalFetch && window.fetch instanceof Proxy) {
+        if (originalXHRopen) {
+            XMLHttpRequest.prototype.open = originalXHRopen;
+            XMLHttpRequest.prototype.send = originalXHRsend;
+            originalXHRopen = null;
+            originalXHRsend = null;
+            console.log('[RequestListener] XMLHttpRequest interception stopped.');
+        }
+        if (originalFetch) {
             window.fetch = originalFetch;
             originalFetch = null;
-            console.log('RequestListener: Fetch API interception stopped.');
+            console.log('[RequestListener] Fetch API interception stopped.');
         }
-        if (originalXHR && window.XMLHttpRequest instanceof Proxy) {
-            window.XMLHttpRequest = originalXHR;
-            originalXHR = null;
-            console.log('RequestListener: XMLHttpRequest interception stopped.');
-        }
-        dataCallback = null;
+        responseCallback = null;
     }
 
     return {
