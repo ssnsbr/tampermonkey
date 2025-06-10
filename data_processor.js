@@ -5,41 +5,54 @@ const DataProcessor = (() => {
 
     // Processes raw WebSocket data
     function processWebSocketData(rawData) {
-        // IMPORTANT: Your existing logic to parse and extract marketCap, volume, ATH from raw WebSocket data goes here.
-        // This is where you would put your JSON parsing and property extraction.
+        // IMPORTANT: Log the raw data first to understand its structure
+        console.log('DataProcessor: Received raw WebSocket data:', rawData);
+
         try {
             const data = JSON.parse(rawData);
-            // Example structure, adjust based on your actual data:
-            const marketCap = data.marketCap || 'N/A';
-            const volume = data.volume24h || 'N/A';
-            const ath = data.allTimeHigh || 'N/A';
+            console.log('DataProcessor: Parsed WebSocket data:', data);
 
-            // Use Utils to format numbers if needed
+            // Assuming the structure for these keys. ADJUST THESE PATHS based on your actual data!
+            // If data.marketCap is nested, e.g., data.metrics.marketCap, you MUST change this.
+            const marketCap = data.marketCap || data.mc || data.market_cap; // Example: Try common key names
+            const volume = data.volume24h || data.vol || data.volume_24h;
+            const ath = data.allTimeHigh || data.ath || data.all_time_high;
+
+            console.log('DataProcessor: Extracted values - MarketCap:', marketCap, 'Volume:', volume, 'ATH:', ath);
+
+            // Use Utils to format numbers. Utils.formatNumber will now handle NaN gracefully.
             return {
-                marketCap: Utils.formatNumber(parseFloat(marketCap), { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-                volume: Utils.formatNumber(parseFloat(volume), { style: 'currency', currency: 'USD', compact: true }),
-                ath: Utils.formatNumber(parseFloat(ath), { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                marketCap: Utils.formatNumber(marketCap, { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+                volume: Utils.formatNumber(volume, { style: 'currency', currency: 'USD', compact: true, minimumFractionDigits: 0, maximumFractionDigits: 2 }), // Adjusted compact options
+                ath: Utils.formatNumber(ath, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }),
             };
         } catch (e) {
-            console.error('DataProcessor: Error parsing WebSocket data:', e);
-            return null;
+            console.error('DataProcessor: Error parsing or processing WebSocket data:', e, 'Raw Data:', rawData);
+            // Return default/fallback data if parsing fails
+            return {
+                marketCap: '---',
+                volume: '---',
+                ath: '---',
+            };
         }
     }
 
     // Processes raw data from HTTP requests (e.g., historical chart data)
     function processRequestData(rawData) {
-        // IMPORTANT: Your existing logic to parse and extract historical chart data from raw request data goes here.
-        // This is where you might store historical points if your existing code captures it.
+        console.log('DataProcessor: Received raw Request data:', rawData);
         try {
             const data = JSON.parse(rawData);
+            console.log('DataProcessor: Parsed Request data:', data);
+
             // Example: Assuming data is an array of chart points { timestamp, price }
             if (Array.isArray(data)) {
-                historicalChartData = historicalChartData.concat(data); // Append new data
-                // Deduplicate or sort if necessary
+                // Deduplicate or sort if necessary if new data overlaps with existing
+                historicalChartData = [...new Set([...historicalChartData, ...data])]; // Simple deduplication
+                console.log('DataProcessor: Updated historical chart data. Total points:', historicalChartData.length);
             }
             return data; // Return the raw processed data for further use if needed
         } catch (e) {
-            console.error('DataProcessor: Error parsing request data:', e);
+            console.error('DataProcessor: Error parsing request data:', e, 'Raw Data:', rawData);
             return null;
         }
     }
