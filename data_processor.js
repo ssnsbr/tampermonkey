@@ -33,9 +33,9 @@ function formatUSD(num) {
  * @param {string} tokenId The ID of the token being monitored.
  */
 function processWebSocketMessage(content, tokenId) {
-    console.log("[DataProcessor] Processing WebSocket message.");
+  //  console.log("[DataProcessor] Processing WebSocket message.");
     if (!content) {
-        console.warn("[DataProcessor] WebSocket content is null or undefined.");
+   //     console.warn("[DataProcessor] WebSocket content is null or undefined.");
         return;
     }
     if (content.pair_address !== tokenId) {
