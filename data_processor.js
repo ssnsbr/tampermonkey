@@ -1,75 +1,57 @@
 // data_processor.js
-// This file is loaded via @require in main.js
-// It exports an object 'DataProcessor' to the global scope.
 
-(function() {
-    'use strict';
+const DataProcessor = (() => {
+    let historicalChartData = []; // To store captured chart data
 
-    let collectedChartData = []; // To store historical chart data for download
+    // Processes raw WebSocket data
+    function processWebSocketData(rawData) {
+        // IMPORTANT: Your existing logic to parse and extract marketCap, volume, ATH from raw WebSocket data goes here.
+        // This is where you would put your JSON parsing and property extraction.
+        try {
+            const data = JSON.parse(rawData);
+            // Example structure, adjust based on your actual data:
+            const marketCap = data.marketCap || 'N/A';
+            const volume = data.volume24h || 'N/A';
+            const ath = data.allTimeHigh || 'N/A';
 
-    const DataProcessor = {
-        processMarketData: function(rawData) {
-            // This is a crucial function. You need to parse the raw WebSocket
-            // message according to Axiom's actual WebSocket data format.
-            console.log("DataProcessor: Processing raw market data...", rawData);
-            try {
-                const data = JSON.parse(rawData); // Assuming rawData is a JSON string
-
-                // Example: Extracting relevant fields. Adjust these based on actual data.
-                const marketCap = data.marketCap || 0;
-                const volume = data.volume24h || 0;
-                const ath = data.allTimeHigh || 0;
-                const price = data.price || 0;
-
-                return {
-                    marketCap: marketCap,
-                    volume: volume,
-                    ath: ath,
-                    price: price,
-                    // Add other relevant fields here
-                };
-            } catch (e) {
-                console.error("DataProcessor: Error parsing market data:", e, rawData);
-                return null;
-            }
-        },
-
-        processChartData: function(rawData) {
-            // Process historical data received from the API request
-            console.log("DataProcessor: Processing raw chart data...", rawData);
-            try {
-                const data = JSON.parse(rawData); // Assuming rawData is a JSON string
-
-                // Example: Assuming data is an array of objects like [{timestamp, price, volume}, ...]
-                // You'll need to adapt this to the actual structure of the historical data API.
-                if (Array.isArray(data)) {
-                    collectedChartData = data.map(item => ({
-                        time: item.timestamp, // or item.t
-                        open: item.open,     // or item.o
-                        high: item.high,     // or item.h
-                        low: item.low,       // or item.l
-                        close: item.close,   // or item.c
-                        volume: item.volume  // or item.v
-                    }));
-                    return collectedChartData;
-                } else {
-                    console.warn("DataProcessor: Raw chart data is not an array.", rawData);
-                    return [];
-                }
-            } catch (e) {
-                console.error("DataProcessor: Error parsing chart data:", e, rawData);
-                return [];
-            }
-        },
-
-        getCollectedChartData: function() {
-            return collectedChartData;
+            // Use Utils to format numbers if needed
+            return {
+                marketCap: Utils.formatNumber(parseFloat(marketCap), { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+                volume: Utils.formatNumber(parseFloat(volume), { style: 'currency', currency: 'USD', compact: true }),
+                ath: Utils.formatNumber(parseFloat(ath), { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            };
+        } catch (e) {
+            console.error('DataProcessor: Error parsing WebSocket data:', e);
+            return null;
         }
+    }
 
-        // Add other data processing functions here (e.g., for different data types)
+    // Processes raw data from HTTP requests (e.g., historical chart data)
+    function processRequestData(rawData) {
+        // IMPORTANT: Your existing logic to parse and extract historical chart data from raw request data goes here.
+        // This is where you might store historical points if your existing code captures it.
+        try {
+            const data = JSON.parse(rawData);
+            // Example: Assuming data is an array of chart points { timestamp, price }
+            if (Array.isArray(data)) {
+                historicalChartData = historicalChartData.concat(data); // Append new data
+                // Deduplicate or sort if necessary
+            }
+            return data; // Return the raw processed data for further use if needed
+        } catch (e) {
+            console.error('DataProcessor: Error parsing request data:', e);
+            return null;
+        }
+    }
+
+    // Provides the collected chart data for download
+    function getChartDataForDownload() {
+        return JSON.stringify(historicalChartData, null, 2);
+    }
+
+    return {
+        processWebSocketData: processWebSocketData,
+        processRequestData: processRequestData,
+        getChartDataForDownload: getChartDataForDownload,
     };
-
-    // Expose DataProcessor to the global scope
-    window.DataProcessor = DataProcessor;
-
 })();
