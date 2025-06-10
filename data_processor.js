@@ -28,10 +28,13 @@ const dataState = {
     pulseTimestamp: 0,      // Timestamp of the last pulse update for freshness check
 
     // Chart Data (from XHR/Fetch)
-    chartAthMarketCap: 0    // All-Time High Market Cap calculated from historical chart data
+    chartAthMarketCap: 0,    // All-Time High Market Cap calculated from historical chart data
+
+    // Lighthouse Data (from WebSocket 'lighthouse' messages)
+    lighthouse5mTotalVolume: 0 // New property for 5m total volume from lighthouse (all protocols)
 };
 
-// --- Utility Functions (Removed formatUSD from here) ---
+// --- Utility Functions (formatUSD is now in utils.js) ---
 
 /**
  * Processes a WebSocket 'trade' message and updates the live data state.
@@ -116,6 +119,22 @@ function processPulseMessage(tokenData) {
 }
 
 /**
+ * Processes a WebSocket 'lighthouse' message.
+ * This updates overall market metrics like total volume.
+ * @param {object} content The 'content' part of the WebSocket message.
+ */
+function processLighthouseMessage(content) {
+    // console.log("[DataProcessor] Processing lighthouse message.");
+    if (content && content['5m'] && content['5m']['All']) {
+        const totalVolume = parseFloat(content['5m']['All'].totalVolume);
+        if (!isNaN(totalVolume)) {
+            dataState.lighthouse5mTotalVolume = totalVolume;
+            // console.log(`%c[DataProcessor] Lighthouse 5m Total Volume (All Protocols) updated: ${formatUSD(dataState.lighthouse5mTotalVolume)}`, 'color: #8B008B; font-weight: bold;');
+        }
+    }
+}
+
+/**
  * Calculates and updates the All-Time High Market Cap from collected chart bars.
  * This should be called whenever allChartBars is updated.
  * @param {Array<object>} allChartBars The array of historical chart bars.
@@ -158,7 +177,7 @@ function getVolumeForTimeframe(minutes) {
 function getFormattedHUDData(tokenId) {
     const { lastPrice, lastMarketCap, athMarketCapSession,
             pulseMarketCapUSD, pulseVolume24hUSD, numHolders, liquidityUSD,
-            chartAthMarketCap, tokenSupply } = dataState;
+            chartAthMarketCap, tokenSupply, lighthouse5mTotalVolume } = dataState;
 
     const volume1m = getVolumeForTimeframe(1);
     const volume5m = getVolumeForTimeframe(5);
@@ -167,10 +186,10 @@ function getFormattedHUDData(tokenId) {
     if (lastPrice !== 0) {
         liveTradeHtml = `
             <b>Current Price:</b> ${formatUSD(lastPrice, 6)}<br>
-            <b>Live Market Cap:</b> ${formatUSD(lastMarketCap)}<br>
-            <b>Volume (1m):</b> ${formatUSD(volume1m)}<br>
-            <b>Volume (5m):</b> ${formatUSD(volume5m)}<br>
-            <b>Session ATH MC:</b> ${formatUSD(athMarketCapSession)}
+            <b>Live Market Cap (Trades):</b> ${formatUSD(lastMarketCap)}<br>
+            <b>Volume (1m / Trades):</b> ${formatUSD(volume1m)}<br>
+            <b>Volume (5m / Trades):</b> ${formatUSD(volume5m)}<br>
+            <b>Session ATH MC (Trades):</b> ${formatUSD(athMarketCapSession)}
         `;
     } else {
         liveTradeHtml = `Loading live trade data...`;
@@ -188,11 +207,21 @@ function getFormattedHUDData(tokenId) {
         pulseDataHtml = `Loading token pulse data...`;
     }
 
+    let overallMarketHtml = '';
+    if (lighthouse5mTotalVolume !== 0) {
+        overallMarketHtml = `
+            <b>Overall Market 5m Volume:</b> ${formatUSD(lighthouse5mTotalVolume, 2)}
+        `;
+    } else {
+        overallMarketHtml = `Loading overall market data...`;
+    }
+
     return `
         <b>Token ID:</b> ${tokenId}<br>
         <b>Total Supply:</b> ${tokenSupply.toLocaleString()}<br><br>
         ${liveTradeHtml}<br><br>
         ${pulseDataHtml}<br><br>
+        ${overallMarketHtml}<br><br>
         <b>Chart ATH MC:</b> ${formatUSD(chartAthMarketCap)}
     `;
 }
