@@ -208,9 +208,9 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
         const volume5m = getVolumeForTimeframe(5);
 
         let liveTradeHtml = '';
+        //                 <b>Current Price:</b> ${Utils.formatUSD(lastPrice, 6)}<br>
         if (lastPrice !== 0) {
             liveTradeHtml = `
-                <b>Current Price:</b> ${Utils.formatUSD(lastPrice, 6)}<br>
                 <b>Live Market Cap (Trades):</b> ${Utils.formatUSD(lastMarketCap)}<br>
                 <b>Volume (1m / Trades):</b> ${Utils.formatUSD(volume1m)}<br>
                 <b>Volume (5m / Trades):</b> ${Utils.formatUSD(volume5m)}<br>
@@ -241,8 +241,8 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
             overallMarketHtml = `Loading overall market data...`;
         }
 
-        //    <b>Token ID:</b> ${tokenId}<br>
-//             <b>Total Supply:</b> ${tokenSupply.toLocaleString()}<br><br>
+        //            <b>Token ID:</b> ${tokenId}<br>
+        //             <b>Total Supply:</b> ${tokenSupply.toLocaleString()}<br><br>
 
         return `
         
