@@ -1,10 +1,11 @@
 // websocket_listener.js
 
 const WebSocketListener = (() => {
-    let originalWebSocketConstructor = null; // Store the original WebSocket constructor
+    let originalWebSocketConstructor = null;
     let dataCallback = null;
+    let allowedRooms = []; // New array to store rooms to filter by
 
-    function startListening(callback) {
+    function startListening(roomsToAllow, callback) {
         if (typeof WebSocket === 'undefined') {
             console.warn('WebSocket is not available in this environment.');
             return;
@@ -15,56 +16,57 @@ const WebSocketListener = (() => {
             return;
         }
 
-        dataCallback = callback; // Store the callback to send data to main.js
+        dataCallback = callback;
+        allowedRooms = Array.isArray(roomsToAllow) ? roomsToAllow : []; // Ensure it's an array
+        console.log('WebSocketListener: Configured to filter for rooms:', allowedRooms);
 
-        // Store the original WebSocket constructor
         originalWebSocketConstructor = window.WebSocket;
 
-        // Create a Proxy for the WebSocket constructor
         window.WebSocket = new Proxy(originalWebSocketConstructor, {
             construct(target, args) {
-                // 'target' is the original WebSocket constructor
-                // 'args' are the arguments passed to 'new WebSocket(...)'
+                const ws = new target(...args);
 
-                const ws = new target(...args); // Create the actual WebSocket instance using the original constructor
-
-                // Intercept messages on the newly created WebSocket instance
                 ws.addEventListener('message', (event) => {
-                    // IMPORTANT: Your existing logic to filter relevant WebSocket messages goes here.
-                    // Only pass relevant data to the callback.
-                    // Example: if (event.target.url.includes('some_relevant_endpoint')) { ... }
-                    // or if (event.data.includes('some_identifying_string')) { ... }
-
-                    // Pass the raw message data to the registered callback in main.js
-                    if (dataCallback) {
-                        dataCallback(event.data);
+                    // --- Filtering Logic Starts Here ---
+                    try {
+                        const messageData = JSON.parse(event.data);
+                        // Check if messageData has a 'room' property and if it's in our allowed list
+                        if (messageData && messageData.room && allowedRooms.includes(messageData.room)) {
+                            // If the room matches, pass the original raw event data to the callback
+                            if (dataCallback) {
+                                dataCallback(event.data);
+                            }
+                        } else {
+                            // Optionally log messages that were filtered out, useful for debugging
+                            // console.debug('WebSocketListener: Filtered out message from room:', messageData.room, 'Data:', messageData);
+                        }
+                    } catch (e) {
+                        // If JSON parsing fails, it's not a message with a 'room' property (or it's malformed JSON)
+                        // Decide if you want to pass these non-JSON messages or just filter them out.
+                        // For now, if it's not parseable JSON, it's filtered out by default.
+                        // console.warn('WebSocketListener: Could not parse WebSocket message data (likely not JSON or missing "room"). Filtering out.', event.data);
                     }
+                    // --- Filtering Logic Ends Here ---
                 });
 
-                // You can also add listeners for 'open', 'close', 'error' if needed for logging/debugging
-                // These will still attach to the actual WebSocket instance
-                // ws.addEventListener('open', (event) => {
-                //     console.log('Intercepted WebSocket opened:', event.target.url);
-                // });
-                // ws.addEventListener('close', (event) => {
-                //     console.log('Intercepted WebSocket closed:', event.target.url, event.code, event.reason);
-                // });
-                // ws.addEventListener('error', (event) => {
-                //     console.error('Intercepted WebSocket error:', event.target.url, event);
-                // });
+                // Other event listeners (open, close, error) can remain here if useful for general debugging
+                // ws.addEventListener('open', (event) => { /* ... */ });
+                // ws.addEventListener('close', (event) => { /* ... */ });
+                // ws.addEventListener('error', (event) => { console.error('Intercepted WebSocket error:', event.target.url, event); });
 
-                return ws; // Return the actual WebSocket instance
+                return ws;
             }
         });
 
-        console.log('WebSocketListener: Proxy-based interception active.');
+        console.log('WebSocketListener: Proxy-based interception with room filtering active.');
     }
 
     function stopListening() {
         if (originalWebSocketConstructor && window.WebSocket instanceof Proxy) {
-            window.WebSocket = originalWebSocketConstructor; // Restore original WebSocket
+            window.WebSocket = originalWebSocketConstructor;
             originalWebSocketConstructor = null;
             dataCallback = null;
+            allowedRooms = []; // Clear allowed rooms on stop
             console.log('WebSocketListener: Interception stopped.');
         }
     }
