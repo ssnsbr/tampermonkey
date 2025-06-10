@@ -18,6 +18,32 @@ const RequestListener = (() => {
                     const response = await Reflect.apply(target, thisArg, args);
                     const clonedResponse = response.clone();
 
+                    // Inside RequestListener.js, within the fetch apply method:
+// ...
+                    const clonedResponse = response.clone();
+                    // NEW: Skip known problematic URLs for processing
+                    if (url.includes('lax1.secure.nozomi.temporal.xyz/ping')) {
+                        console.debug('RequestListener: Skipping processing for known problematic URL (ping).');
+                        return response; // Immediately return without processing/logging
+                    }
+
+                    if (clonedResponse.ok && clonedResponse.headers.get('content-type')?.includes('application/json')) {
+// ...
+
+// Inside RequestListener.js, within the XHR load event listener:
+// ...
+                    const url = this.responseURL;
+                    // NEW: Skip known problematic URLs for processing
+                    if (url.includes('lax1.secure.nozomi.temporal.xyz/ping')) {
+                        console.debug('RequestListener: Skipping processing for known problematic URL (ping).');
+                        return; // Immediately return without processing/logging
+                    }
+
+                    if (this.readyState === 4 && this.status === 200) {
+                        const contentType = this.getResponseHeader('Content-Type');
+                        if (contentType && contentType.includes('application/json')) {
+// ...
+
                     // You can add filtering here based on the URL or response headers
                     // For example, only process/log responses from specific endpoints
                     // if (!url.includes('/api/v1/some-specific-data')) {
