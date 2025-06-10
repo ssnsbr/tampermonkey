@@ -1,6 +1,8 @@
 // data_processor.js
 // Encapsulates logic for processing WebSocket data and maintaining state.
 
+console.log("[DataProcessor] Initializing data_processor.js");
+
 const dataState = {
     ath: 0,
     volume24h: 0,
@@ -31,13 +33,20 @@ function formatUSD(num) {
  * @param {string} tokenId The ID of the token being monitored.
  */
 function processWebSocketMessage(content, tokenId) {
-    if (!content || content.pair_address !== tokenId) return;
+    console.log("[DataProcessor] Processing WebSocket message.");
+    if (!content) {
+        console.warn("[DataProcessor] WebSocket content is null or undefined.");
+        return;
+    }
+    if (content.pair_address !== tokenId) {
+        console.warn(`[DataProcessor] Mismatched pair_address. Expected ${tokenId}, got ${content.pair_address}.`);
+        return;
+    }
 
     const now = Date.now();
     const price = content.price_usd;
     const marketCap = price * 1_000_000_000; // Assuming fixed supply leading to this calculation
 
-    // Save transaction for 24h volume calc
     const transactionValueUsd = content.total_usd || 0;
     dataState.txs.push({ ts: now, usd: transactionValueUsd });
     dataState.allTxData.push({ // Store for full download
@@ -45,31 +54,28 @@ function processWebSocketMessage(content, tokenId) {
         price_usd: price,
         total_usd_transaction: transactionValueUsd,
         pair_address: content.pair_address,
-        // Add other relevant fields from 'content' if needed for download
         tx_hash: content.tx_hash,
-        tx_type: content.tx_type, // "buy" or "sell"
+        tx_type: content.tx_type,
         buyer_address: content.buyer_address,
         seller_address: content.seller_address
     });
+    console.log(`[DataProcessor] Added live transaction. Total live txs: ${dataState.allTxData.length}`);
 
 
-    // Clean up old transactions (older than 24 hours)
     const oneDayAgo = now - 86400000;
     while (dataState.txs.length && dataState.txs[0].ts < oneDayAgo) {
         dataState.txs.shift();
     }
 
-    // Calculate 24h volume
     dataState.volume24h = dataState.txs.reduce((sum, tx) => sum + tx.usd, 0);
 
-    // Update All-Time High
     if (price > dataState.ath) {
         dataState.ath = price;
     }
 
-    // Update last known price and market cap
     dataState.lastPrice = price;
     dataState.lastMarketCap = marketCap;
+    console.log(`[DataProcessor] Updated live data: Price=$${formatUSD(price)}, MC=$${formatUSD(marketCap)}`);
 }
 
 /**
@@ -81,7 +87,7 @@ function getFormattedHUDData(tokenId) {
     const { lastPrice, lastMarketCap, volume24h, ath } = dataState;
 
     if (lastPrice === 0) {
-        return `Loading data for ${tokenId}...`;
+        return `Loading live data for ${tokenId}...`;
     }
 
     return `
@@ -98,5 +104,6 @@ function getFormattedHUDData(tokenId) {
  * @returns {Array<object>} An array of raw transaction objects.
  */
 function getAllTransactionData() {
+    console.log(`[DataProcessor] Providing all live transaction data. Count: ${dataState.allTxData.length}`);
     return dataState.allTxData;
 }
