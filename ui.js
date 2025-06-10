@@ -5,7 +5,10 @@ const UI_Manager = (() => {
 
     // Function to create and append the initial HUD structure
     function init() {
-        if (hudContainer) return; // Prevent re-initialization
+        if (hudContainer) {
+            console.log('UI_Manager: HUD already initialized.');
+            return; // Prevent re-initialization
+        }
 
         hudContainer = document.createElement('div');
         hudContainer.id = 'axiom-token-hud';
@@ -21,48 +24,54 @@ const UI_Manager = (() => {
             z-index: 10000;
             font-family: sans-serif;
             font-size: 14px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            backdrop-filter: blur(5px); /* Modern frosted glass effect */
+            -webkit-backdrop-filter: blur(5px);
         `;
 
         hudContainer.innerHTML = `
             <h3>Token Stats</h3>
-            <p>Market Cap: <span id="hud-marketcap">Loading...</span></p>
-            <p>Volume (24h): <span id="hud-volume">Loading...</span></p>
-            <p>ATH: <span id="hud-ath">Loading...</span></p>
-            <button id="downloadChartDataBtn">Download Chart Data</button>
-            <div id="chart-data-status"></div>
+            <p>Market Cap: <span id="hud-marketcap">---</span></p>
+            <p>Volume (24h): <span id="hud-volume">---</span></p>
+            <p>ATH: <span id="hud-ath">---</span></p>
+            <button id="downloadChartDataBtn" style="
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-top: 10px;
+                font-size: 13px;
+            ">Download Chart Data</button>
+            <div id="chart-data-status" style="margin-top: 5px; font-size: 12px; color: #aaa;"></div>
         `;
 
         document.body.appendChild(hudContainer);
-
-        // Attach event listener for the download button (example)
-        // This assumes main.js will provide the data for download
-        // document.getElementById('downloadChartDataBtn').addEventListener('click', () => {
-        //     // This click event would trigger a function in main.js or pass a signal
-        //     // to get data from DataProcessor and then use Utils.downloadFile
-        //     console.log('Download chart data button clicked!');
-        //     // Example: You'd typically call a function passed from main.js or trigger a custom event
-        //     // to ask main.js to get the data and download it.
-        // });
+        console.log('UI_Manager: HUD initialized and appended to body.');
     }
 
     // Function to update the HUD with new data
     function updateHUD(data) {
         if (!hudContainer) {
-            init(); // Initialize if not already done (should be called from main.js)
+            console.warn('UI_Manager: HUD container not found. Call init() first.');
+            // Attempt to initialize if not already, though main.js should handle this.
+            init();
+            if (!hudContainer) return; // If still not initialized, something is wrong.
         }
 
         const marketCapSpan = document.getElementById('hud-marketcap');
         const volumeSpan = document.getElementById('hud-volume');
         const athSpan = document.getElementById('hud-ath');
 
-        if (marketCapSpan && data.marketCap) {
-            marketCapSpan.textContent = data.marketCap; // Assumes data is already formatted
+        if (marketCapSpan) {
+            marketCapSpan.textContent = data.marketCap || '---';
         }
-        if (volumeSpan && data.volume) {
-            volumeSpan.textContent = data.volume; // Assumes data is already formatted
+        if (volumeSpan) {
+            volumeSpan.textContent = data.volume || '---';
         }
-        if (athSpan && data.ath) {
-            athSpan.textContent = data.ath; // Assumes data is already formatted
+        if (athSpan) {
+            athSpan.textContent = data.ath || '---';
         }
     }
 
