@@ -39,7 +39,7 @@ function processWebSocketMessage(content, tokenId) {
         return;
     }
     if (content.pair_address !== tokenId) {
-        console.warn(`[DataProcessor] Mismatched pair_address. Expected ${tokenId}, got ${content.pair_address}.`);
+       /// console.warn(`[DataProcessor] Mismatched pair_address. Expected ${tokenId}, got ${content.pair_address}.`);
         return;
     }
 
