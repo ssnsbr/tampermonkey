@@ -138,10 +138,7 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
      * @param {string} type The type of interception ('XHR' or 'Fetch') for logging purposes.
      */
     function processChartData(bars, noData, type) {
-        if (noData) {
-            console.log(`%c[DataProcessor][${type}] Chart API response indicates no more data (noData: true).`, 'color: gray;');
-            return;
-        }
+
 
         if (Array.isArray(bars) && bars.length > 0) {
             const newBars = bars.filter(newBar =>
@@ -156,6 +153,10 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
             console.log(`%c[DataProcessor][${type}] Total unique chart bars collected: ${dataState.chartBars.length}`, 'color: darkgreen; font-weight: bold;');
         } else {
             console.warn(`%c[DataProcessor][${type}] Chart API response contains no 'bars' array or it's empty.`, 'color: orange;');
+        }
+        if (noData) {
+            console.log(`%c[DataProcessor][${type}] Chart API response indicates no more data (noData: true).`, 'color: gray;');
+            return;
         }
     }
 
