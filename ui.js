@@ -28,6 +28,7 @@ function createFloatingUI(sections) {
     uiContainer.style.resize = 'both'; // Allow resizing
     uiContainer.style.overflow = 'auto'; // Add scrollbars if content overflows
     uiContainer.style.maxHeight = '90vh'; // Prevent it from going off-screen vertically
+    uiContainer.style.transition = 'all 0.3s ease'; // Smooth transitions
 
     // Header for moving the UI
     const header = document.createElement('div');
@@ -35,24 +36,83 @@ function createFloatingUI(sections) {
     header.style.fontWeight = 'bold';
     header.style.marginBottom = '10px';
     header.style.cursor = 'grab';
-    header.innerText = 'Axiom Token Data HUD';
+    header.style.display = 'flex';
+    header.style.alignItems = 'center';
+    header.style.justifyContent = 'space-between';
+    
+    const title = document.createElement('span');
+    title.innerText = 'Axiom Token Data HUD';
+    title.style.flex = '1';
+    title.style.textAlign = 'center';
+    
+    // Expand/Collapse button
+    const expandBtn = document.createElement('button');
+    expandBtn.textContent = '−'; // Minimize symbol
+    expandBtn.style.background = 'none';
+    expandBtn.style.border = '1px solid lime';
+    expandBtn.style.color = 'lime';
+    expandBtn.style.fontSize = '16px';
+    expandBtn.style.cursor = 'pointer';
+    expandBtn.style.width = '25px';
+    expandBtn.style.height = '25px';
+    expandBtn.style.borderRadius = '3px';
+    expandBtn.style.marginRight = '5px';
+    expandBtn.title = 'Minimize/Expand';
+
+    header.appendChild(expandBtn);
+    header.appendChild(title);
     uiContainer.appendChild(header);
 
     // Close button
     const closeBtn = document.createElement('button');
-    closeBtn.textContent = 'X';
+    closeBtn.textContent = '×';
     closeBtn.style.position = 'absolute';
     closeBtn.style.top = '10px';
     closeBtn.style.right = '10px';
     closeBtn.style.background = 'none';
     closeBtn.style.border = 'none';
     closeBtn.style.color = 'lime';
-    closeBtn.style.fontSize = '16px';
+    closeBtn.style.fontSize = '18px';
     closeBtn.style.cursor = 'pointer';
+    closeBtn.style.fontWeight = 'bold';
     closeBtn.onclick = () => uiContainer.remove();
     uiContainer.appendChild(closeBtn);
 
-    // Add sections dynamically
+    // Content container (what gets hidden/shown)
+    const contentContainer = document.createElement('div');
+    contentContainer.id = 'hud-content-container';
+    contentContainer.style.transition = 'all 0.3s ease';
+    
+    // Track collapsed state
+    let isCollapsed = false;
+
+    // Expand/Collapse functionality
+    expandBtn.onclick = () => {
+        isCollapsed = !isCollapsed;
+        
+        if (isCollapsed) {
+            // Collapse
+            contentContainer.style.maxHeight = '0';
+            contentContainer.style.overflow = 'hidden';
+            contentContainer.style.padding = '0';
+            contentContainer.style.margin = '0';
+            expandBtn.textContent = '+';
+            expandBtn.title = 'Expand';
+            uiContainer.style.height = 'auto';
+            uiContainer.style.minHeight = '60px';
+        } else {
+            // Expand
+            contentContainer.style.maxHeight = 'none';
+            contentContainer.style.overflow = 'visible';
+            contentContainer.style.padding = '';
+            contentContainer.style.margin = '';
+            expandBtn.textContent = '−';
+            expandBtn.title = 'Minimize';
+            uiContainer.style.minHeight = '';
+        }
+    };
+
+    // Add sections dynamically to the content container
     sections.forEach(section => {
         const sectionDiv = document.createElement('div');
         sectionDiv.id = section.id; // e.g., 'hud-live-data-section' or 'hud-chart-data-section'
@@ -72,7 +132,6 @@ function createFloatingUI(sections) {
         sectionTitle.style.padding = '0 5px';
         sectionTitle.textContent = section.title;
         sectionDiv.appendChild(sectionTitle);
-
 
         // Content area for dynamic data
         const contentArea = document.createElement('div');
@@ -127,15 +186,19 @@ function createFloatingUI(sections) {
             }
             sectionDiv.appendChild(buttonContainer);
         }
-        uiContainer.appendChild(sectionDiv);
+        contentContainer.appendChild(sectionDiv);
     });
 
+    uiContainer.appendChild(contentContainer);
 
     // Make the UI draggable
     let isDragging = false;
     let offsetX, offsetY;
 
     header.addEventListener('mousedown', (e) => {
+        // Don't start dragging if clicking on buttons
+        if (e.target === expandBtn || e.target === closeBtn) return;
+        
         isDragging = true;
         offsetX = e.clientX - uiContainer.getBoundingClientRect().left;
         offsetY = e.clientY - uiContainer.getBoundingClientRect().top;
@@ -146,6 +209,7 @@ function createFloatingUI(sections) {
         if (!isDragging) return;
         uiContainer.style.left = `${e.clientX - offsetX}px`;
         uiContainer.style.top = `${e.clientY - offsetY}px`;
+        uiContainer.style.right = 'auto'; // Remove right positioning when dragging
     });
 
     document.addEventListener('mouseup', () => {
@@ -166,5 +230,25 @@ function updateHUDContent(sectionId, htmlContent) {
     const contentArea = document.getElementById(`${sectionId}-content`);
     if (contentArea) {
         contentArea.innerHTML = htmlContent;
+    }
+}
+
+/**
+ * Programmatically collapse or expand the HUD
+ * @param {boolean} collapse - true to collapse, false to expand
+ */
+function setHUDCollapsed(collapse = true) {
+    const container = document.getElementById('axiom-hud-container');
+    const expandBtn = container?.querySelector('button[title*="Minimize"], button[title*="Expand"]');
+    const contentContainer = document.getElementById('hud-content-container');
+    
+    if (!container || !expandBtn || !contentContainer) return;
+    
+    const isCurrentlyCollapsed = expandBtn.textContent === '+';
+    
+    if (collapse && !isCurrentlyCollapsed) {
+        expandBtn.click();
+    } else if (!collapse && isCurrentlyCollapsed) {
+        expandBtn.click();
     }
 }
