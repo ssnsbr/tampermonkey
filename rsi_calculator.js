@@ -99,20 +99,73 @@ class RSICalculator {
      * Process multiple historical prices at once (for chart data)
      * @param {Array} priceData - Array of {price, timestamp} or just prices
      */
+    
+    // processHistoricalData(priceData) {
+    //     console.log(`[RSI] Processing ${priceData.length} historical price points`);
+        
+    //     priceData.forEach((item, index) => {
+    //         let price, timestamp;
+            
+    //         if (typeof item === 'object') {
+    //             price = item.close || item.price;
+    //             timestamp = item.time || item.timestamp;
+    //         } else {
+    //             price = item;
+    //             timestamp = Date.now() - (priceData.length - index) * 60000; // Assume 1min intervals
+    //         }
+            
+    //         if (price && typeof price === 'number') {
+    //             this.addPrice(price, timestamp);
+    //         }
+    //     });
+
+    //     const currentRSI = this.getCurrentRSI();
+    //     if (currentRSI !== null) {
+    //         console.log(`[RSI] Historical processing complete. Final RSI: ${currentRSI.toFixed(2)}`);
+    //     }
+    // }
+    
+    /**
+     * Process multiple historical prices at once (for chart data)
+     * @param {Array} priceData - Array of {price, timestamp} or just prices
+     */
     processHistoricalData(priceData) {
         console.log(`[RSI] Processing ${priceData.length} historical price points`);
-        
-        priceData.forEach((item, index) => {
+
+        const lastKnownTimestamp = this.priceHistory.length > 0
+            ? this.priceHistory[this.priceHistory.length - 1].timestamp
+            : 0;
+
+        const newPriceData = priceData.filter(item => {
+            let timestamp;
+            if (typeof item === 'object') {
+                timestamp = item.time || item.timestamp;
+            } else {
+                // If it's just a price, we can't filter by timestamp,
+                // so we'll just process it. This is a fallback.
+                return true;
+            }
+            return timestamp > lastKnownTimestamp;
+        });
+
+        if (newPriceData.length === 0) {
+            console.log('[RSI] No new historical data to process.');
+            return;
+        }
+
+        console.log(`[RSI] Found ${newPriceData.length} new historical data points to process.`);
+
+        newPriceData.forEach((item) => {
             let price, timestamp;
-            
+
             if (typeof item === 'object') {
                 price = item.close || item.price;
                 timestamp = item.time || item.timestamp;
             } else {
                 price = item;
-                timestamp = Date.now() - (priceData.length - index) * 60000; // Assume 1min intervals
+                timestamp = Date.now(); // Or handle appropriately
             }
-            
+
             if (price && typeof price === 'number') {
                 this.addPrice(price, timestamp);
             }
@@ -123,6 +176,7 @@ class RSICalculator {
             console.log(`[RSI] Historical processing complete. Final RSI: ${currentRSI.toFixed(2)}`);
         }
     }
+
 
     /**
      * Get current RSI value
