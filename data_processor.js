@@ -1,8 +1,6 @@
 // data_processor.js
 // Encapsulates logic for processing WebSocket data and maintaining state.
-
 console.log("[DataProcessor] Initializing data_processor.js");
-
 /* global Utils */ // Ensure Utils is accessible here
 
 // --- Configuration ---
@@ -14,25 +12,25 @@ let SOL_USD_PRICE = 150; // Placeholder: Assume 1 SOL = $150 USD for now
 const dataState = {
     // General Token Info
     tokenSupply: 1_000_000_000, // Default fallback, will be updated by pulse message if available
-
+    
     // Live Trade Data (from WebSocket 'trade' messages)
     lastPrice: 0,           // Last known price in USD from trade messages
     lastMarketCap: 0,       // Last calculated market cap in USD from trade messages (price * supply)
     athMarketCapSession: 0, // All-Time High Market Cap observed in current session from trade messages
     txs: [],                // Stores { ts: timestamp, usd: transaction_value } for *dynamic* volume calculations
     allTxData: [],          // To store all raw processed trade data for download
-
+    
     // Pulse Data (from WebSocket 'update_pulse' messages)
     pulseMarketCapUSD: 0,   // Market Cap from pulse data, converted to USD
     pulseVolume24hUSD: 0,   // 24h Volume from pulse data, converted to USD
     numHolders: 0,
     liquidityUSD: 0,        // Liquidity in USD
     pulseTimestamp: 0,      // Timestamp of the last pulse update for freshness check
-
+    
     // Chart Data (from XHR/Fetch)
     chartAthMarketCap: 0,   // All-Time High Market Cap calculated from historical chart data
     chartBars: [],          // Array to store all collected historical chart bars
-
+    
     // Lighthouse Data (from WebSocket 'lighthouse' messages)
     lighthouse5mTotalVolume: 0 // New property for 5m total volume from lighthouse (all protocols)
 };
@@ -48,6 +46,7 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
     function processTradeMessage(content, tokenId) {
         const now = Date.now();
         const price = parseFloat(content.price_usd);
+        
         if (isNaN(price)) {
             console.warn("[DataProcessor] Invalid price_usd received in trade message:", content.price_usd);
             return;
@@ -85,6 +84,7 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
             liquidity_sol: content.liquidity_sol,
             liquidity_token: content.liquidity_token
         });
+
         console.log(`%c[DataProcessor] Trade DataState updated: Price=${Utils.formatUSD(dataState.lastPrice, 6)}, MC=${Utils.formatUSD(dataState.lastMarketCap)}, Session ATH MC=${Utils.formatUSD(dataState.athMarketCapSession)}`, 'color: blue; font-weight: bold;');
     }
 
@@ -138,13 +138,13 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
      * @param {string} type The type of interception ('XHR' or 'Fetch') for logging purposes.
      */
     function processChartData(bars, noData, type) {
-
-
         if (Array.isArray(bars) && bars.length > 0) {
             const newBars = bars.filter(newBar =>
                 !dataState.chartBars.some(existingBar => existingBar.time === newBar.time)
             );
+
             console.log(`%c[DataProcessor][${type}] Found ${bars.length} bars in response. Adding ${newBars.length} new unique bars.`, 'color: teal;');
+
             dataState.chartBars.push(...newBars);
             dataState.chartBars.sort((a, b) => a.time - b.time); // Keep bars sorted by time
 
@@ -154,12 +154,12 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
         } else {
             console.warn(`%c[DataProcessor][${type}] Chart API response contains no 'bars' array or it's empty.`, 'color: orange;');
         }
+
         if (noData) {
             console.log(`%c[DataProcessor][${type}] Chart API response indicates no more data (noData: true).`, 'color: gray;');
             return;
         }
     }
-
 
     /**
      * Calculates and updates the All-Time High Market Cap from collected chart bars.
@@ -208,49 +208,38 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
         const volume1m = getVolumeForTimeframe(1);
         const volume5m = getVolumeForTimeframe(5);
 
-        let liveTradeHtml = '';
-        //                 <b>Current Price:</b> ${Utils.formatUSD(lastPrice, 6)}<br>
+        // Build sections with proper line breaks
+        let sections = [];
+
+        // Live Trade Data Section
         if (lastPrice !== 0) {
-            liveTradeHtml = `
-                <b>Live Market Cap (Trades):</b> ${Utils.formatUSD(lastMarketCap)}<br>
-                <b>Volume (1m / Trades):</b> ${Utils.formatUSD(volume1m)}<br>
-                <b>Volume (5m / Trades):</b> ${Utils.formatUSD(volume5m)}<br>
-                <b>Session ATH MC (Trades):</b> ${Utils.formatUSD(athMarketCapSession)}
-            `;
+            sections.push(`<b>Live Market Cap (Trades):</b> ${Utils.formatUSD(lastMarketCap)}<br>
+<b>Volume (1m / Trades):</b> ${Utils.formatUSD(volume1m)}<br>
+<b>Volume (5m / Trades):</b> ${Utils.formatUSD(volume5m)}<br>
+<b>Session ATH MC (Trades):</b> ${Utils.formatUSD(athMarketCapSession)}`);
         } else {
-            liveTradeHtml = `Loading live trade data...`;
+            sections.push(`<span style="color: #888;">Loading live trade data...</span>`);
         }
 
-        let pulseDataHtml = '';
+        // Pulse Data Section
         if (pulseMarketCapUSD !== 0) {
-            pulseDataHtml = `
-                <b>24h Market Cap (Pulse):</b> ${Utils.formatUSD(pulseMarketCapUSD, 2)}<br>
-                <b>24h Total Volume (Pulse):</b> ${Utils.formatUSD(pulseVolume24hUSD, 2)}<br>
-                <b>Holders:</b> ${numHolders.toLocaleString()}<br>
-                <b>Liquidity:</b> ${Utils.formatUSD(liquidityUSD, 2)}
-            `;
+            sections.push(`<b>24h Market Cap (Pulse):</b> ${Utils.formatUSD(pulseMarketCapUSD, 2)}<br>
+<b>24h Total Volume (Pulse):</b> ${Utils.formatUSD(pulseVolume24hUSD, 2)}<br>
+<b>Holders:</b> ${numHolders.toLocaleString()}<br>
+<b>Liquidity:</b> ${Utils.formatUSD(liquidityUSD, 2)}`);
         } else {
-            pulseDataHtml = `Loading token pulse data...`;
+            sections.push(`<span style="color: #888;">Loading token pulse data...</span>`);
         }
 
-        let overallMarketHtml = '';
+        // Overall Market Section
         if (lighthouse5mTotalVolume !== 0) {
-            overallMarketHtml = `
-                <b>Overall Market 5m Volume:</b> ${Utils.formatUSD(lighthouse5mTotalVolume, 2)}
-            `;
+            sections.push(`<b>Overall Market 5m Volume:</b> ${Utils.formatUSD(lighthouse5mTotalVolume, 2)}`);
         } else {
-            overallMarketHtml = `Loading overall market data...`;
+            sections.push(`<span style="color: #888;">Loading overall market data...</span>`);
         }
 
-        //            <b>Token ID:</b> ${tokenId}<br>
-        //             <b>Total Supply:</b> ${tokenSupply.toLocaleString()}<br><br>
-
-        return `
-        
-            ${liveTradeHtml}<br><br>
-            ${pulseDataHtml}<br><br>
-            ${overallMarketHtml}
-        `;
+        // Join sections with proper spacing
+        return sections.join('<br><br>');
     }
 
     /**
@@ -306,6 +295,22 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
         }
     }
 
+    /**
+     * Get the current price for RSI calculations
+     * @returns {number} Current price or 0 if not available
+     */
+    function getCurrentPrice() {
+        return dataState.lastPrice;
+    }
+
+    /**
+     * Get data state for debugging
+     * @returns {object} Current data state
+     */
+    function getDataState() {
+        return { ...dataState }; // Return a copy to prevent external modifications
+    }
+
     return {
         processTradeMessage,
         processPulseMessage,
@@ -318,6 +323,8 @@ const DataProcessor = (() => { // Wrap the data processing logic in an IIFE for 
         getChartBarsCount,
         getChartBarsRange,
         getChartDataForDownload,
-        setSolUsdPrice
+        setSolUsdPrice,
+        getCurrentPrice,     // New method for getting current price
+        getDataState         // New method for debugging
     };
 })();
