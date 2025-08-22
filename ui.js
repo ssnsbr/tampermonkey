@@ -13,7 +13,7 @@ function createFloatingUI(sections) {
     const uiContainer = document.createElement('div');
     uiContainer.id = 'axiom-hud-container';
     uiContainer.style.position = 'fixed';
-    uiContainer.style.top = '50px';
+    uiContainer.style.top = '40px';
     uiContainer.style.right = '20px';
     uiContainer.style.width = '320px'; // Adjusted width for more content/buttons
     uiContainer.style.backgroundColor = 'rgba(0,0,0,0.4)';
