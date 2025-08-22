@@ -13,10 +13,10 @@ function createFloatingUI(sections) {
     const uiContainer = document.createElement('div');
     uiContainer.id = 'axiom-hud-container';
     uiContainer.style.position = 'fixed';
-    uiContainer.style.top = '20px';
+    uiContainer.style.top = '50px';
     uiContainer.style.right = '20px';
     uiContainer.style.width = '320px'; // Adjusted width for more content/buttons
-    uiContainer.style.backgroundColor = 'rgba(0,0,0,0.9)';
+    uiContainer.style.backgroundColor = 'rgba(0,0,0,0.4)';
     uiContainer.style.color = 'lime';
     uiContainer.style.fontSize = '14px'; // Slightly smaller font for more info
     uiContainer.style.fontFamily = 'monospace';
